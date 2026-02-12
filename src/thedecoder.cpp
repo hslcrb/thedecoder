@@ -96,8 +96,8 @@ int main(int argc, char** argv) {
 
         if (arg == "/py" && i + 1 < argc) {
              std::string target = argv[++i];
-             std::cout << "Python Reversing engaged for: " << target << std::endl;
-             std::cout << PythonRev::runFullSequence(target) << std::endl;
+             std::cout << "\033[1;36m[*] Python Reversing engaged for: " << target << "\033[0m" << std::endl;
+             std::cout << PythonRev::runFullSequence(target, false) << std::endl;
              return 0;
         }
 

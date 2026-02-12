@@ -23,6 +23,8 @@
 #include <QStatusBar>
 #include <QDir>
 #include <QPainter>
+#include <QApplication>
+#include <QThread>
 #include <QTextBlock>
 #include <QSettings>
 #include "../visualizer.h"
@@ -506,15 +508,43 @@ void MainWindow::extractStrings() {
 }
 
 void MainWindow::runPythonRev() {
-    QString fileName = QFileDialog::getOpenFileName(this, "Select Python Binary (.exe)", "", "Executable Files (*.exe);;All Files (*)");
-    if (fileName.isEmpty()) return;
+    QString infile = QFileDialog::getOpenFileName(this, "Select Python Binary (.exe)", "", "Executable Files (*.exe);;All Files (*)");
+    if (infile.isEmpty()) return;
 
     statusBar()->showMessage(I18n::instance().get("python_rev").c_str());
     
-    std::string result = PythonRev::runFullSequence(fileName.toStdString());
-    addEditorTab(QFileInfo(fileName).fileName() + " [PyRev Log]", QString::fromStdString(result));
+    AsmEditor *ed = new AsmEditor(this);
+    QString log = QString::fromStdString(PythonRev::runFullSequence(infile.toStdString(), true));
+    loadLargeText(ed, log);
+    addEditorTab(QFileInfo(infile).fileName() + " [PyRev Log]", log);
+
+    // Monster Grade Automation: 5s Countdown / 몬스터 등급 자동화: 5초 카운트다운
+    m_progressBar->setVisible(true);
+    m_progressBar->setRange(0, 50);
+    m_progressBar->setValue(0);
     
-    if (result.find("Successfully extracted") != std::string::npos) {
+    QLabel *countLabel = new QLabel(m_tabs);
+    countLabel->setAlignment(Qt::AlignCenter);
+    countLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #8ab4f8; padding: 20px;");
+    m_tabs->setCornerWidget(countLabel, Qt::TopRightCorner);
+
+    for (int i = 50; i >= 0; --i) {
+        m_progressBar->setValue(50 - i);
+        countLabel->setText(QString(" Opening Source in %1s... ").arg(QString::number(i/10.0, 'f', 1)));
+        qApp->processEvents();
+        QThread::msleep(100);
+    }
+
+    m_progressBar->setVisible(false);
+    m_tabs->setCornerWidget(nullptr, Qt::TopRightCorner);
+    delete countLabel;
+
+    // Save and Open Source / 소스 저장 및 열기
+    std::string recovered = PythonRev::getRecoveredPath(infile.toStdString());
+    std::ifstream in(recovered);
+    if (in.is_open()) {
+        std::string src((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        addEditorTab(QFileInfo(QString::fromStdString(recovered)).fileName(), QString::fromStdString(src));
         statusBar()->showMessage("Extraction successful!", 5000);
     } else {
         statusBar()->showMessage("Extraction failed.", 5000);

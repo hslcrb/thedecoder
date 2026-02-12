@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <algorithm>
 #include <sstream>
+#include <thread>
+#include <chrono>
 
 /**
  * @brief Python Reversing Suite (Bridge to pyinstxtractor and pycdc)
@@ -17,7 +19,7 @@
  */
 class PythonRev {
 public:
-    static std::string runFullSequence(const std::string& exePath) {
+    static std::string runFullSequence(const std::string& exePath, bool isGui = false) {
         std::string log;
         log += "[*] Phase 1: Archive Extraction (pyinstxtractor)\n";
         
@@ -51,7 +53,6 @@ public:
                 size_t pos = line.find(":");
                 if (pos != std::string::npos) {
                     entryPoint = line.substr(pos + 1);
-                    // Trim spaces / 공백 제거
                     entryPoint.erase(0, entryPoint.find_first_not_of(" "));
                     entryPoint.erase(entryPoint.find_last_not_of(" ") + 1);
                 }
@@ -67,13 +68,13 @@ public:
 
         log += "[*] Phase 3: Decompilation (pycdc)\n";
         std::string pycdcPath = findTool("pycdc");
+        std::string pycFullPath = folder + "/" + entryPoint;
+
         if (pycdcPath.empty()) {
             log += "[!] pycdc not found in tools/. Manual decompile required.\n";
-            log += "[*] Use: tools/pycdc " + folder + "/" + (entryPoint.empty() ? "*.pyc" : entryPoint) + "\n";
         } else if (entryPoint.empty()) {
             log += "[!] Could not determine entry point. Check folder: " + folder + "\n";
         } else {
-            std::string pycFullPath = folder + "/" + entryPoint;
             log += "[+] Decompiling " + pycFullPath + " ...\n";
             std::string decompileCmd = quote(pycdcPath) + " " + quote(pycFullPath) + " 2>&1";
             std::string decompileOut = exec(decompileCmd.c_str());
@@ -83,7 +84,37 @@ public:
             log += "\n-------------------------------------------\n";
         }
 
+        if (!isGui) {
+            log += "\n[*] Monster Grade Automation: Opening source in 5 seconds...\n";
+            for (int i = 5; i > 0; --i) {
+                std::cout << "\r[*] " << i << " SECS REMAINING... [";
+                for (int j = 0; j < 20; ++j) {
+                    if (j < (5 - i + 1) * 4) std::cout << "=";
+                    else std::cout << " ";
+                }
+                std::cout << "] " << std::flush;
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            std::cout << "\n[+] Launching editor...\n";
+            // For CLI, we just print where to find it or suggest xdg-open if available
+            std::string openCmd = "vi " + quote(folder + "/extracted_source.py"); // Template
+            // Actual decompile for saving
+            std::string pycdcExec = findTool("pycdc");
+            if (!pycdcExec.empty() && !entryPoint.empty()) {
+                std::string saveCmd = quote(pycdcExec) + " " + quote(pycFullPath) + " > " + quote(folder + "/source_recovered.py");
+                system(saveCmd.c_str());
+                log += "\n[+] Source saved to: " + folder + "/source_recovered.py\n";
+            }
+        }
+
         return log;
+    }
+
+    /**
+     * @brief Get the full path to the recovered script / 복구된 스크립트의 전체 경로 반환
+     */
+    static std::string getRecoveredPath(const std::string& exePath) {
+        return exePath + "_extracted/source_recovered.py";
     }
 
 private:
@@ -106,7 +137,8 @@ private:
         std::vector<std::string> searches = {
             "tools/" + toolName,
             "../tools/" + toolName,
-            "/home/rheehose/문서/rheeworks_nt/thedecoder/tools/" + toolName
+            "/home/rheehose/문서/rheeworks_nt/thedecoder/tools/" + toolName,
+            "./build/tools/" + toolName
         };
         for (const auto& s : searches) {
             if (fileExists(s)) return s;
@@ -115,7 +147,7 @@ private:
     }
 
     static std::string exec(const char* cmd) {
-        char buffer[128];
+        char buffer[1024];
         std::string result = "";
         FILE* pipe = popen(cmd, "r");
         if (!pipe) return "Error: Failed to execute command.";
