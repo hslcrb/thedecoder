@@ -9,6 +9,7 @@
 #include <QProcess>
 #include <QStatusBar>
 #include <QLabel>
+#include <QProgressBar>
 #include "../visualizer.h"
 
 class DashboardWidget : public QWidget {
@@ -36,6 +37,8 @@ private slots:
     void openBinary();
     void saveAsm();
     void procFinished(int exitCode, QProcess::ExitStatus status);
+    void readProcOutput();
+    void readProcError();
     void onFileTreeActivated(const QModelIndex &index);
     void closeTab(int index);
     void checkDashboard();
@@ -44,6 +47,8 @@ private:
     void addEditorTab(const QString &title, const QString &content, bool isViz = false);
     void loadLargeText(QTextEdit *ed, const QString &content);
     QString detectArch(const QString &path);
+    void appendToCurrentTab(const QString &text);
+    void startDisassembly(const QString &file, const QString &arch);
 
     QTabWidget *m_tabs;
     QTreeView *m_tree;
@@ -51,9 +56,12 @@ private:
     QAction *m_openAct;
     QAction *m_saveAct;
     QCheckBox *m_intelCheck;
+    QProgressBar *m_progressBar;
     QProcess *m_proc;
     QString m_currentAsmPath;
     DashboardWidget *m_dashboard;
+    long long m_totalExpectedSize;
+    long long m_processedSize;
 };
 
 #endif // MAINWINDOW_H

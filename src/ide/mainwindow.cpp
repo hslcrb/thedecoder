@@ -101,6 +101,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_intelCheck = new QCheckBox("Intel syntax", this);
     tb->addWidget(m_intelCheck);
 
+    m_progressBar = new QProgressBar(this);
+    m_progressBar->setVisible(false);
+    m_progressBar->setMaximumHeight(15);
+    statusBar()->addPermanentWidget(m_progressBar);
+
+    connect(m_proc, &QProcess::readyReadStandardOutput, this, &MainWindow::readProcOutput);
+    connect(m_proc, &QProcess::readyReadStandardError, this, &MainWindow::readProcError);
     connect(m_proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &MainWindow::procFinished);
 
     statusBar()->showMessage("Ready");
@@ -176,7 +183,9 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::addEditorTab(const QString &title, const QString &content, bool isViz)
 {
     QTextEdit *ed = new QTextEdit(this);
-    loadLargeText(ed, content);
+    if (!content.isEmpty()) {
+        loadLargeText(ed, content);
+    }
     
     if (!isViz) {
         AsmHighlighter *hl = new AsmHighlighter(ed->document());
@@ -188,6 +197,40 @@ void MainWindow::addEditorTab(const QString &title, const QString &content, bool
     int idx = m_tabs->addTab(ed, title);
     m_tabs->setCurrentIndex(idx);
     checkDashboard();
+}
+
+void MainWindow::appendToCurrentTab(const QString &text) {
+    QWidget *w = m_tabs->currentWidget();
+    if (!w) return;
+    QTextEdit *ed = qobject_cast<QTextEdit*>(w);
+    if (!ed) return;
+
+    // To prevent freezing on truly massive outputs, we cap the LIVE view
+    if (ed->document()->characterCount() > 2000000) {
+        return; 
+    }
+
+    ed->moveCursor(QTextCursor::End);
+    ed->insertPlainText(text);
+}
+
+void MainWindow::readProcOutput() {
+    QByteArray data = m_proc->readAllStandardOutput();
+    m_processedSize += data.size();
+    
+    if (m_totalExpectedSize > 0) {
+        // objdump output size is roughly 3-5x the binary size
+        double progress = (double)m_processedSize / (m_totalExpectedSize * 4.0);
+        if (progress > 0.99) progress = 0.99;
+        m_progressBar->setValue(progress * 100);
+    }
+
+    appendToCurrentTab(QString::fromLocal8Bit(data));
+}
+
+void MainWindow::readProcError() {
+    QByteArray data = m_proc->readAllStandardError();
+    appendToCurrentTab("\n--- stderr ---\n" + QString::fromLocal8Bit(data) + "\n");
 }
 
 void MainWindow::loadLargeText(QTextEdit *ed, const QString &content) {
@@ -226,22 +269,30 @@ void MainWindow::openBinary()
 {
     QString file = QFileDialog::getOpenFileName(this, "Open binary");
     if (file.isEmpty()) return;
+    startDisassembly(file, detectArch(file));
+}
 
-    QString arch = detectArch(file);
+void MainWindow::startDisassembly(const QString &file, const QString &arch) {
+    m_totalExpectedSize = QFileInfo(file).size();
+    m_processedSize = 0;
+    m_progressBar->setValue(0);
+    m_progressBar->setVisible(true);
+
     QStringList args;
     args << "-d";
-    if (arch == "x86-64" || arch == "i386") {
-        if (m_intelCheck->isVisible()) { // If user can see the check, respect it, but auto-detect usually wants intel
-             args << "-Mintel";
-        }
-    }
+    if (arch == "x86-64" || arch == "i386") args << "-Mintel";
     args << file;
 
     m_currentAsmPath.clear();
+    
+    // Create tab FIRST for async streaming / 비동기 스트리밍을 위해 탭 먼저 생성
+    addEditorTab(QFileInfo(file).fileName(), "");
+    
     m_proc->start("objdump", args);
     if (!m_proc->waitForStarted(3000)) {
         QMessageBox::critical(this, "Error", "Failed to start objdump. Ensure binutils is installed and in your PATH.\nError: " + m_proc->errorString());
         statusBar()->showMessage("Error: Failed to start objdump");
+        m_progressBar->setVisible(false);
     } else {
         statusBar()->showMessage("Disassembling (" + arch + "): " + file);
     }
@@ -250,31 +301,23 @@ void MainWindow::openBinary()
 void MainWindow::procFinished(int exitCode, QProcess::ExitStatus status)
 {
     Q_UNUSED(status)
-    QByteArray out = m_proc->readAllStandardOutput();
-    QByteArray err = m_proc->readAllStandardError();
-    QString display;
-    if (!err.isEmpty()) {
-        display += "--- stderr ---\n" + QString::fromLocal8Bit(err) + "\n";
-    }
-    display += QString::fromLocal8Bit(out);
+    m_progressBar->setValue(100);
+    m_progressBar->setVisible(false);
 
-    // create new tab with assembly
-    QString title = "thedecoder";
-    QStringList args = m_proc->arguments();
-    if (!args.isEmpty()) {
-        QString bin = args.last();
-        title = QFileInfo(bin).fileName();
-        m_currentAsmPath = bin + ".asm";
+    // Get final output for visualization engine / 시각화 엔진을 위한 최종 출력 획득
+    QWidget *w = m_tabs->currentWidget();
+    if (w) {
+        QTextEdit *ed = qobject_cast<QTextEdit*>(w);
+        if (ed) {
+             QString display = ed->toPlainText();
+             std::string mermaid = Visualizer::generateMermaidCFG(display.toStdString());
+             addEditorTab(m_tabs->tabText(m_tabs->currentIndex()) + " [Map]", QString::fromStdString(mermaid), true);
+        }
     }
-    addEditorTab(title, display);
-
-    // Generate Visualization / 시각화 생성
-    std::string mermaid = Visualizer::generateMermaidCFG(display.toStdString());
-    addEditorTab(title + " [Map]", QString::fromStdString(mermaid), true);
 
     statusBar()->showMessage("Disassembly finished", 3000);
 
-    if (exitCode != 0) {
+    if (exitCode != 0 && exitCode != 137) { // Ignore code 137 if caught manually
         QMessageBox::warning(this, "objdump", "objdump exited with code " + QString::number(exitCode));
     }
 }
@@ -284,11 +327,6 @@ void MainWindow::onFileTreeActivated(const QModelIndex &index)
     if (!m_fsModel) return;
     QString path = m_fsModel->filePath(index);
     if (QFileInfo(path).isDir()) return;
-
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly)) return;
-    // We don't need header as detectArch does it
-    f.close();
 
     QString arch = detectArch(path);
     bool isBin = (arch != "unknown");
@@ -302,12 +340,9 @@ void MainWindow::onFileTreeActivated(const QModelIndex &index)
     }
 
     if (isBin) {
-        QStringList args;
-        args << "-d";
-        if (arch == "x86-64" || arch == "i386") args << "-Mintel";
-        args << path;
-        m_proc->start("objdump", args);
+        startDisassembly(path, arch);
     } else {
+        QFile f(path);
         if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return;
         QString content = QString::fromLocal8Bit(f.readAll());
         addEditorTab(QFileInfo(path).fileName(), content);

@@ -1,10 +1,40 @@
-/*
- * (C) Rheehose (Rhee Creative) 2008-2026
- * Simple Disassembler Wrapper
- */
 #include <bits/stdc++.h>
 #include <cstdio>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "visualizer.h"
+
+void print_logo() {
+    std::cout << "\033[1;36m";
+    std::cout << "  _   _              _                     _           \n";
+    std::cout << " | |_| |__   ___  __| | ___  ___ ___   __| | ___ _ __ \n";
+    std::cout << " | __| '_ \\ / _ \\/ _` |/ _ \\/ __/ _ \\ / _` |/ _ \\ '__|\n";
+    std::cout << " | |_| | | |  __/ (_| |  __/ (_| (_) | (_| |  __/ |   \n";
+    std::cout << "  \\__|_| |_|\\___|\\__,_|\\___|\\___\\___/ \\__,_|\\___|_|   \n";
+    std::cout << "\033[0m";
+    std::cout << "         --- Beyond Perfection, Monster Grade ---\n\n";
+}
+
+void print_progress(double percentage) {
+    int width = 50;
+    std::cout << "\r[";
+    int pos = width * percentage;
+    for (int i = 0; i < width; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    std::cout << "] " << int(percentage * 100.0) << "% " << std::flush;
+}
+
+std::string clean_path(std::string path) {
+    if (path.empty()) return path;
+    if ((path.front() == '"' && path.back() == '"') || (path.front() == '\'' && path.back() == '\'')) {
+        path = path.substr(1, path.size() - 2);
+    }
+    // Simple normalization: convert \ to / for internal use if needed, but here we just keep it
+    return path;
+}
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -17,11 +47,11 @@ int main(int argc, char** argv) {
     bool intel = false;
     bool graph = false;
 
-    infile = argv[1];
+    infile = clean_path(argv[1]);
     for (int i = 2; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "-o" && i + 1 < argc) {
-            outfile = argv[++i];
+            outfile = clean_path(argv[++i]);
         } else if (a == "--intel") {
             intel = true;
         } else if (a == "--graph") {
@@ -29,8 +59,8 @@ int main(int argc, char** argv) {
         } else if (a == "-h" || a == "--help") {
             std::cout << "Usage: thedecoder <binary> [-o output.asm] [--intel] [--graph]\n";
             std::cout << "Options:\n";
-            std::cout << "  -o FILE    Output file path (default: <input>.asm)\n";
-            std::cout << "  --intel    Use Intel syntax for disassembly\n";
+            std::cout << "  -o FILE    Output file path (default: <input>.asm in same dir)\n";
+            std::cout << "  --intel    Use Intel syntax (Auto-detected for x86)\n";
             std::cout << "  --graph    Generate Mermaid CFG graph (.md)\n";
             return 0;
         } else {
@@ -42,6 +72,13 @@ int main(int argc, char** argv) {
     if (outfile.empty()) {
         outfile = infile + ".asm";
     }
+
+    struct stat st;
+    if (stat(infile.c_str(), &st) != 0) {
+        std::cerr << "Error: Cannot find input file: " << infile << "\n";
+        return 1;
+    }
+    long long total_size = st.st_size;
 
     // Auto-detect architecture / 아키텍처 자동 탐지
     std::string arch_cmd = "objdump -f " + infile + " 2>/dev/null";
@@ -75,17 +112,30 @@ int main(int argc, char** argv) {
         return 3;
     }
 
-    char buf[4096];
+    std::cout << "Analyzing: " << infile << " (" << (total_size / 1024) << " KB)\n";
+
+    char buf[8192];
+    long long processed = 0;
     while (fgets(buf, sizeof(buf), pipe)) {
-        ofs << buf;
+        std::string line = buf;
+        ofs << line;
+        
+        // Highly simplified progress estimation based on output lines/content
+        // objdump output is usually larger than original binary, we approximate
+        processed += line.size();
+        double progress = (double)processed / (total_size * 3.0); // Rough factor for objdump expansion
+        if (progress > 0.99) progress = 0.99;
+        print_progress(progress);
     }
+    print_progress(1.0);
+    std::cout << "\n";
 
     int status = pclose(pipe);
     if (status != 0) {
-        std::cerr << "objdump exited with status: " << status << " (this may still have produced output)\n";
+        std::cerr << "Note: objdump finished with status: " << status << "\n";
     }
 
-    std::cout << "Wrote assembly to: " << outfile << "\n";
+    std::cout << "\033[1;32mDONE!\033[0m Results saved to: " << outfile << "\n";
 
     if (graph) {
         std::ifstream ifs(outfile, std::ios::in | std::ios::binary);
