@@ -8,6 +8,7 @@
 #include <fstream>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <algorithm>
 
 /**
  * @brief Python Reversing Suite (Bridge to pyinstxtractor and uncompyle6)
@@ -20,23 +21,26 @@ public:
         log += "[*] Phase 1: Archive Extraction (pyinstxtractor)\n";
         
         std::string pyInstPath = findTool("pyinstxtractor.py");
+        std::string quotedExe = quote(exePath);
         std::string extractCmd;
         std::string extractOut;
 
         if (pyInstPath.empty()) {
-            // Try as a python module first if local script not found
-            extractCmd = "python3 -m pyinstxtractor " + exePath + " 2>&1";
+            // 1. Try python module if local script not found
+            extractCmd = "python3 -m pyinstxtractor " + quotedExe + " 2>&1";
             extractOut = exec(extractCmd.c_str());
         } else {
+            // 2. Use local tool
+            std::string quotedTool = quote(pyInstPath);
             log += "[+] Using tool at: " + pyInstPath + "\n";
-            extractCmd = "python3 " + pyInstPath + " " + exePath + " 2>&1";
+            extractCmd = "python3 " + quotedTool + " " + quotedExe + " 2>&1";
             extractOut = exec(extractCmd.c_str());
         }
 
         log += extractOut + "\n";
  
         if (extractOut.find("Successfully extracted") == std::string::npos) {
-            return log + "\n[!] Extraction failed. Ensure pyinstxtractor.py is available in tools/ or as a python module.\n";
+            return log + "\n[!] Extraction failed. Check path quoting or tool availability.\n";
         }
 
         log += "[*] Phase 2: Locating Bytecode (.pyc)\n";
@@ -51,6 +55,20 @@ public:
     }
 
 private:
+    /**
+     * @brief Safely quote path for shell execution / 쉘 실행을 위해 경로를 안전하게 따옴표로 감쌈
+     */
+    static std::string quote(const std::string& path) {
+        std::string p = path;
+        // Escape existing single quotes / 기존 싱글 쿼테이션 이스케이프
+        size_t pos = 0;
+        while ((pos = p.find("'", pos)) != std::string::npos) {
+            p.replace(pos, 1, "'\\''");
+            pos += 4;
+        }
+        return "'" + p + "'";
+    }
+
     static bool fileExists(const std::string& path) {
         struct stat buffer;
         return (stat(path.c_str(), &buffer) == 0);
