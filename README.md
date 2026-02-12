@@ -27,15 +27,15 @@ cmake --build .
 ### CLI
 ```bash
 ### 1. Command Line Interface (CLI) / 명령줄 인터페이스
-The `disasm` tool allows you to disassemble binary files directly from the terminal.
-`disasm` 도구를 사용하면 터미널에서 직접 바이너리 파일을 역어셈블할 수 있습니다.
+The `thedecoder` tool allows you to disassemble binary files directly from the terminal.
+`thedecoder` 도구를 사용하면 터미널에서 직접 바이너리 파일을 역어셈블할 수 있습니다.
 
 ```bash
 # Basic usage with Intel syntax / Intel 문법을 사용한 기본법
-./build/disasm <input_binary> -o <output_asm> --intel
+./build/thedecoder <input_binary> -o <output_asm> --intel
 
 # Generate visualization map (Mermaid CFG) / 시각화 맵 생성 (Mermaid CFG)
-./build/disasm <input_binary> -o <output_asm> --intel --graph
+./build/thedecoder <input_binary> -o <output_asm> --intel --graph
 ```
 
 - `-o <file>`: Specify output filename (default: input name with .asm). / 출력 파일명을 지정합니다 (기본값: 입력파일명.asm).
@@ -43,12 +43,12 @@ The `disasm` tool allows you to disassemble binary files directly from the termi
 - `--graph`: Generate a `.map.md` file containing a Mermaid CFG. / Mermaid CFG가 포함된 `.map.md` 파일을 생성합니다.
 
 ### 2. Graphical User Interface (GUI) / 그래픽 사용자 인터페이스
-The `disasm-ide` provides a premium, high-performance environment for binary analysis.
-`disasm-ide`는 바이너리 분석을 위한 프리미엄 고성능 환경을 제공합니다.
+The `thedecoder-ide` provides a premium, high-performance environment for binary analysis.
+`thedecoder-ide`는 바이너리 분석을 위한 프리미엄 고성능 환경을 제공합니다.
 
 ```bash
 # Launch the IDE / IDE 실행
-./build/disasm-ide
+./build/thedecoder-ide
 ```
 
 - **Features / 주요 기능**:

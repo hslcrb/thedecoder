@@ -10,7 +10,7 @@ EXTERNAL SOFTWARE COMPONENTS / 외부 소프트웨어 구성 요소
 This product interacts with and/or links against the following external components:
 
 1. Qt Framework (LGPL v3)
-   - Used for the graphical user interface (disasm-ide).
+   - Used for the graphical user interface (thedecoder-ide).
    - This project uses the Qt5 Widgets module.
    - The Qt libraries are dynamically linked.
    - Website: https://www.qt.io/

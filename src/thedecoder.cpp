@@ -8,7 +8,7 @@
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "Usage: disasm <binary> [-o output.asm] [--intel]\n";
+        std::cerr << "Usage: thedecoder <binary> [-o output.asm] [--intel]\n";
         return 1;
     }
 
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         } else if (a == "--graph") {
             graph = true;
         } else if (a == "-h" || a == "--help") {
-            std::cout << "Usage: disasm <binary> [-o output.asm] [--intel] [--graph]\n";
+            std::cout << "Usage: thedecoder <binary> [-o output.asm] [--intel] [--graph]\n";
             std::cout << "Options:\n";
             std::cout << "  -o FILE    Output file path (default: <input>.asm)\n";
             std::cout << "  --intel    Use Intel syntax for disassembly\n";

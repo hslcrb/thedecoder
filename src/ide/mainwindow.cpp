@@ -259,7 +259,7 @@ void MainWindow::procFinished(int exitCode, QProcess::ExitStatus status)
     display += QString::fromLocal8Bit(out);
 
     // create new tab with assembly
-    QString title = "disasm";
+    QString title = "thedecoder";
     QStringList args = m_proc->arguments();
     if (!args.isEmpty()) {
         QString bin = args.last();

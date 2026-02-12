@@ -22,8 +22,8 @@ jobs:
     - name: Package
       run: |
         mkdir -p release
-        cp build/disasm release/
-        if [ -f build/disasm-ide ]; then cp build/disasm-ide release/; fi
+        cp build/thedecoder release/
+        if [ -f build/thedecoder-ide ]; then cp build/thedecoder-ide release/; fi
         zip -r thedecoder-linux.zip release/
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -31,7 +31,29 @@ jobs:
         name: thedecoder-linux
         path: thedecoder-linux.zip
 
-  # Docker build job
+  create-release:
+    needs: [build-linux]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thedecoder-linux
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: thedecoder-linux.zip
+          tag_name: v0.0.${{ github.run_number }}
+          name: Release v0.0.${{ github.run_number }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-docker:
     runs-on: ubuntu-latest
     permissions:
