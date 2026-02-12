@@ -1,0 +1,105 @@
+name: Build and Release / 빌드 및 릴리스
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }} / ${{ matrix.os }}에서 빌드
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Qt (Linux) / Qt 설치 (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install -y qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools binutils
+
+    - name: Install Qt (macOS) / Qt 설치 (macOS)
+      if: matrix.os == 'macos-latest'
+      run: brew install qt@5
+
+    - name: Install Qt (Windows) / Qt 설치 (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '5.15.2'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
+
+    - name: Configure CMake / CMake 구성
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build / 빌드
+      run: cmake --build build --config Release
+
+    - name: Package / 패키징
+      shell: bash
+      run: |
+        mkdir -p release_assets/${{ matrix.os }}
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          cp build/Release/disasm.exe release_assets/${{ matrix.os }}/
+          [ -f build/Release/disasm-ide.exe ] && cp build/Release/disasm-ide.exe release_assets/${{ matrix.os }}/
+        else
+          cp build/disasm release_assets/${{ matrix.os }}/
+          [ -f build/disasm-ide ] && cp build/disasm-ide release_assets/${{ matrix.os }}/
+        fi
+        zip -r thedecoder-${{ matrix.os }}.zip release_assets/
+
+    - name: Upload Artifacts / 아티팩트 업로드
+      uses: actions/upload-artifact@v4
+      with:
+        name: thedecoder-${{ matrix.os }}
+        path: thedecoder-${{ matrix.os }}.zip
+
+  publish-docker:
+    name: Publish Docker Image / 도커 이미지 게시
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Login to GitHub Container Registry / GitHub 컨테이너 레지스트리 로그인
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image / 도커 이미지 빌드 및 푸시
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/thedecoder:latest
+          ghcr.io/${{ github.repository_owner }}/thedecoder:${{ github.sha }}
+
+  release:
+    name: Create Release / 릴리스 생성
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+    - name: Download all artifacts / 모든 아티팩트 다운로드
+      uses: actions/download-artifact@v4
+
+    - name: Create GitHub Release / GitHub 릴리스 생성
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          thedecoder-ubuntu-latest/thedecoder-ubuntu-latest.zip
+          thedecoder-windows-latest/thedecoder-windows-latest.zip
+          thedecoder-macos-latest/thedecoder-macos-latest.zip
+        tag_name: v0.0.${{ github.run_number }}
+        name: Release v0.0.${{ github.run_number }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

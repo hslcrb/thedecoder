@@ -1,0 +1,13 @@
+build/
+.vscode/
+.idea/
+*.o
+*.a
+*.so
+*.exe
+disasm
+disasm-ide
+recycle_trash/
+agents_brain/
+thedecoder-*.zip
+release_assets/
