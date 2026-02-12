@@ -57,6 +57,10 @@ private:
         m_dict["extract_strings"] = {"문자열 추출", "Extract Strings"};
         m_dict["python_rev"] = {"파이썬 분석", "Python Rev"};
         m_dict["strings_finished"] = {"문자열 추출 완료", "Strings extraction finished"};
+        m_dict["theme_toggle"] = {"테마 전환", "Toggle Theme"};
+        m_dict["light_mode"] = {"라이트 모드", "Light Mode"};
+        m_dict["dark_mode"] = {"다크 모드", "Dark Mode"};
+        m_dict["interpreted_rev"] = {"인터프리터 분석", "Interpreted Rev"};
         
         // CLI specific / CLI 전용
         m_dict["cli_usage"] = {"사용법: thedecoder <바이너리> [옵션]", "Usage: thedecoder <binary> [options]"};

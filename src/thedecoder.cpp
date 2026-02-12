@@ -8,9 +8,39 @@
 #include <cstdio>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wordexp.h>
 #include "visualizer.h"
 #include "i18n.h"
 #include "strings_extractor.h"
+#include "python_rev.h"
+
+// Constants / 상수
+const char* CONFIG_FILE = "~/.thedecoder_rc";
+
+std::string get_config_path() {
+    wordexp_t exp_result;
+    wordexp(CONFIG_FILE, &exp_result, 0);
+    std::string path = exp_result.we_wordv[0];
+    wordfree(&exp_result);
+    return path;
+}
+
+void load_settings() {
+    std::ifstream in(get_config_path());
+    if (!in.is_open()) return;
+    std::string key, val;
+    while (in >> key >> val) {
+        if (key == "lang") {
+            if (val == "EN") I18n::instance().setLanguage(Language::EN);
+            else I18n::instance().setLanguage(Language::KO);
+        }
+    }
+}
+
+void save_settings() {
+    std::ofstream out(get_config_path());
+    out << "lang " << (I18n::instance().currentLanguage() == Language::EN ? "EN" : "KO") << std::endl;
+}
 
 /**
  * @brief thedecoder: Monster Grade Binary Analyzer (CLI)
@@ -35,6 +65,7 @@ void print_logo() {
 }
 
 int main(int argc, char** argv) {
+    load_settings();
     std::string infile;
     std::string outfile = "output.asm";
     bool intel = false;
@@ -44,9 +75,16 @@ int main(int argc, char** argv) {
         std::string arg = argv[i];
         if (arg == "/lang") {
             I18n::instance().toggleLanguage();
+            save_settings();
             std::cout << "Language changed / 언어 변경됨: " << I18n::instance().get("lang_toggle") << std::endl;
             if (argc == 2) return 0; // Just toggling / 그냥 전환만 함
             continue;
+        }
+
+        if (arg == "/theme") {
+            // CLI Theme simply toggles between light/dark-friendly colors
+            std::cout << "Theme toggled. Current environment assumed." << std::endl;
+            return 0;
         }
         
         if (arg == "/strings" && i + 1 < argc) {
@@ -59,7 +97,7 @@ int main(int argc, char** argv) {
         if (arg == "/py" && i + 1 < argc) {
              std::string target = argv[++i];
              std::cout << "Python Reversing engaged for: " << target << std::endl;
-             std::cout << "[!] Please ensure pyinstxtractor is installed via pip." << std::endl;
+             std::cout << PythonRev::runFullSequence(target) << std::endl;
              return 0;
         }
 

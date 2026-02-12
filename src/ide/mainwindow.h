@@ -74,8 +74,10 @@ private slots:
     void saveAs();         // New: Save As / 새 기능: 다른 이름으로 저장
     void toggleLanguage(); // New: Language Toggle / 새 기능: 언어 전환
     void toggleReadOnly(); // New: Read-Only Toggle / 새 기능: 읽기 전용 토글
+    void toggleTheme();    // New: Theme Toggle / 새 기능: 테마 전환
     void extractStrings(); // New: Strings Extraction / 새 기능: 문자열 추출
     void runPythonRev();   // New: Python Reversing / 새 기능: 파이썬 리버싱
+    void runInterpretedRev(); // New: Interpreted Reversing / 새 기능: 인터프리터 리버싱
     void procFinished(int exitCode, QProcess::ExitStatus status);
     void readProcOutput();
     void readProcError();
@@ -91,6 +93,7 @@ private:
     void appendToCurrentTab(const QString &text);
     void startDisassembly(const QString &file, const QString &arch);
     void updateUiText(); // Helper to refresh KR/EN labels / KR/EN 레이블 새로고침 헬퍼
+    void applyTheme();   // New: Apply CSS theme
 
     QTabWidget *m_tabs;
     QAction *m_openAct;
@@ -100,6 +103,8 @@ private:
     QAction *m_readOnlyAct;
     QAction *m_stringsAct;
     QAction *m_pythonAct;
+    QAction *m_interpretedAct;
+    QAction *m_themeAct;
     QProgressBar *m_progressBar;
     QString m_lastStatusMsg; // Persistence for status / 상태 유지를 위한 메시지
     QProcess *m_proc;
@@ -107,7 +112,8 @@ private:
     DashboardWidget *m_dashboard;
     long long m_totalExpectedSize;
     long long m_processedSize;
-    bool m_isReadOnly;
+    bool m_isReadOnly; // New state variable
+    bool m_isDarkMode; // New state variable
 
     friend class AsmEditor; // For accessing m_readOnlyAct / m_readOnlyAct 접근용
 };
