@@ -14,52 +14,68 @@
 #include <QVBoxLayout>
 #include <QFile>
 #include <QTextStream>
+#include <QScrollBar>
+#include <QAbstractTextDocumentLayout>
 #include <QTabWidget>
-#include <QTreeView>
-#include <QFileSystemModel>
-#include <QDockWidget>
+#include <QLabel>
 #include <QPushButton>
-#include <QGroupBox>
 #include "highlighter.h"
 #include <QStatusBar>
+#include <QDir>
 #include "../visualizer.h"
 
-DashboardWidget::DashboardWidget(QWidget *parent) : QWidget(parent) {
-    QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setAlignment(Qt::AlignCenter);
+/**
+ * @brief Simple Dashboard for landing state / 랜딩 상태를 위한 단순 대시보드
+ */
+class DashboardWidget : public QWidget {
+    Q_OBJECT
+public:
+    DashboardWidget(QWidget *parent = nullptr) : QWidget(parent) {
+        QVBoxLayout *layout = new QVBoxLayout(this);
+        layout->setAlignment(Qt::AlignCenter);
 
-    QLabel *logo = new QLabel("thedecoder", this);
-    logo->setStyleSheet("font-size: 48px; font-weight: bold; color: #8ab4f8; margin-bottom: 20px;");
-    layout->addWidget(logo);
+        QLabel *logo = new QLabel("thedecoder", this);
+        logo->setStyleSheet("font-size: 56px; font-weight: bold; color: #8ab4f8; margin-bottom: 20px;");
+        layout->addWidget(logo);
 
-    QLabel *desc = new QLabel("Monster-Grade Binary Analyzer", this);
-    desc->setStyleSheet("font-size: 18px; color: #9aa0a6; margin-bottom: 40px;");
-    layout->addWidget(desc);
+        QLabel *desc = new QLabel("Monster-Grade Binary Analyzer & Disassembler", this);
+        desc->setStyleSheet("font-size: 20px; color: #9aa0a6; margin-bottom: 40px;");
+        layout->addWidget(desc);
 
-    QPushButton *openBtn = new QPushButton("Open New Binary", this);
-    openBtn->setFixedSize(200, 50);
-    openBtn->setStyleSheet(R"(
-        QPushButton {
-            background-color: #8ab4f8;
-            color: #202124;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background-color: #aecbfa;
-        }
-    )");
-    layout->addWidget(openBtn);
-    connect(openBtn, &QPushButton::clicked, this, &DashboardWidget::openRequested);
-}
+        QPushButton *openBtn = new QPushButton("Open New Binary", this);
+        openBtn->setFixedSize(220, 60);
+        openBtn->setStyleSheet(R"(
+            QPushButton {
+                background-color: #8ab4f8;
+                color: #202124;
+                border-radius: 30px;
+                font-size: 18px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #aecbfa;
+            }
+        )");
+        layout->addWidget(openBtn);
+        connect(openBtn, &QPushButton::clicked, [this](){ emit openRequested(); });
+    }
+
+signals:
+    void openRequested();
+};
+
+#include "mainwindow.moc" 
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), m_proc(new QProcess(this))
+    : QMainWindow(parent), m_isReadOnly(true)
 {
-    setWindowTitle("Disasm IDE");
-    resize(1100, 700);
+    setWindowTitle("thedecoder - Advanced Binary Analyzer");
+    resize(1200, 800);
 
+    // Initial setup for i18n / i18n 초기 설정
+    I18n::instance().setLanguage(Language::KO);
+
+    m_proc = new QProcess(this);
     m_tabs = new QTabWidget(this);
     m_tabs->setTabsClosable(true);
     connect(m_tabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
@@ -75,42 +91,11 @@ MainWindow::MainWindow(QWidget *parent)
     QWidget *central = new QWidget(this);
     central->setLayout(mainLayout);
     setCentralWidget(central);
-    
+
+    setupToolbar();
+    setupStatusBar();
+
     checkDashboard();
-
-    // File tree dock
-    m_fsModel = new QFileSystemModel(this);
-    m_fsModel->setRootPath(QDir::homePath());
-    m_tree = new QTreeView(this);
-    m_tree->setModel(m_fsModel);
-    m_tree->setRootIndex(m_fsModel->index(QDir::homePath()));
-    m_tree->setHeaderHidden(false);
-    QDockWidget *dock = new QDockWidget("Files", this);
-    dock->setWidget(m_tree);
-    addDockWidget(Qt::LeftDockWidgetArea, dock);
-
-    connect(m_tree, &QTreeView::activated, this, &MainWindow::onFileTreeActivated);
-
-    QToolBar *tb = addToolBar("Main");
-    m_openAct = tb->addAction("Open Binary");
-    connect(m_openAct, &QAction::triggered, this, &MainWindow::openBinary);
-
-    m_saveAct = tb->addAction("Save ASM");
-    connect(m_saveAct, &QAction::triggered, this, &MainWindow::saveAsm);
-
-    m_intelCheck = new QCheckBox("Intel syntax", this);
-    tb->addWidget(m_intelCheck);
-
-    m_progressBar = new QProgressBar(this);
-    m_progressBar->setVisible(false);
-    m_progressBar->setMaximumHeight(15);
-    statusBar()->addPermanentWidget(m_progressBar);
-
-    connect(m_proc, &QProcess::readyReadStandardOutput, this, &MainWindow::readProcOutput);
-    connect(m_proc, &QProcess::readyReadStandardError, this, &MainWindow::readProcError);
-    connect(m_proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &MainWindow::procFinished);
-
-    statusBar()->showMessage("Ready");
 
     // Premium Dark Theme - Samsung Notes inspired / 프리미엄 다크 테마 - 삼성 노트 스타일
     QString qss = R"(
@@ -123,7 +108,6 @@ MainWindow::MainWindow(QWidget *parent)
             color: #e8eaed;
             border: 1px solid #3c4043;
             border-radius: 8px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
             padding: 10px;
         }
@@ -144,45 +128,92 @@ MainWindow::MainWindow(QWidget *parent)
             color: #8ab4f8;
             border-bottom: 2px solid #8ab4f8;
         }
-        QTreeView {
-            background-color: #1a1a1b;
-            color: #e8eaed;
-            border: none;
-        }
-        QTreeView::item:hover {
-            background-color: #2d2e30;
-        }
-        QTreeView::item:selected {
-            background-color: #313235;
-            color: #8ab4f8;
-        }
         QToolBar {
             background-color: #1a1a1b;
             border-bottom: 1px solid #3c4043;
-            spacing: 10px;
-            padding: 5px;
-        }
-        QCheckBox {
-            color: #e8eaed;
+            spacing: 12px;
+            padding: 6px;
         }
         QStatusBar {
             background-color: #1a1a1b;
             color: #9aa0a6;
             border-top: 1px solid #3c4043;
         }
-        QHeaderView::section {
-            background-color: #202124;
-            color: #9aa0a6;
-            border: 1px solid #3c4043;
-            padding: 4px;
-        }
     )";
     this->setStyleSheet(qss);
 }
 
+void MainWindow::setupToolbar() {
+    QToolBar *tb = addToolBar("Main");
+    tb->setMovable(false);
+
+    m_openAct = new QAction(I18n::instance().get("open_binary").c_str(), this);
+    connect(m_openAct, &QAction::triggered, this, &MainWindow::openBinary);
+    tb->addAction(m_openAct);
+
+    m_saveAct = new QAction(I18n::instance().get("save_asm").c_str(), this);
+    connect(m_saveAct, &QAction::triggered, this, &MainWindow::saveAsm);
+    tb->addAction(m_saveAct);
+
+    m_saveAsAct = new QAction(I18n::instance().get("save_as").c_str(), this);
+    connect(m_saveAsAct, &QAction::triggered, this, &MainWindow::saveAs);
+    tb->addAction(m_saveAsAct);
+
+    tb->addSeparator();
+
+    m_langAct = new QAction(I18n::instance().get("lang_toggle").c_str(), this);
+    connect(m_langAct, &QAction::triggered, this, &MainWindow::toggleLanguage);
+    tb->addAction(m_langAct);
+
+    m_readOnlyAct = new QAction(I18n::instance().get("read_only").c_str(), this);
+    m_readOnlyAct->setCheckable(true);
+    m_readOnlyAct->setChecked(true);
+    connect(m_readOnlyAct, &QAction::triggered, this, &MainWindow::toggleReadOnly);
+    tb->addAction(m_readOnlyAct);
+}
+
+void MainWindow::setupStatusBar() {
+    m_progressBar = new QProgressBar(this);
+    m_progressBar->setVisible(false);
+    m_progressBar->setMaximumHeight(15);
+    statusBar()->addPermanentWidget(m_progressBar);
+
+    connect(m_proc, &QProcess::readyReadStandardOutput, this, &MainWindow::readProcOutput);
+    connect(m_proc, &QProcess::readyReadStandardError, this, &MainWindow::readProcError);
+    connect(m_proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &MainWindow::procFinished);
+
+    statusBar()->showMessage(I18n::instance().get("ready").c_str());
+}
+
+void MainWindow::updateUiText() {
+    setWindowTitle(I18n::instance().get("app_title").c_str());
+    m_openAct->setText(I18n::instance().get("open_binary").c_str());
+    m_saveAct->setText(I18n::instance().get("save_asm").c_str());
+    m_saveAsAct->setText(I18n::instance().get("save_as").c_str());
+    m_langAct->setText(I18n::instance().get("lang_toggle").c_str());
+    m_readOnlyAct->setText(I18n::instance().get("read_only").c_str());
+    
+    if (m_progressBar->isVisible()) {
+        statusBar()->showMessage(I18n::instance().get("disassembling").c_str());
+    } else if (!m_lastStatusMsg.isEmpty()) {
+        statusBar()->showMessage(m_lastStatusMsg);
+    } else {
+        statusBar()->showMessage(I18n::instance().get("ready").c_str());
+    }
+}
+
+void MainWindow::toggleLanguage() {
+    I18n::instance().toggleLanguage();
+    updateUiText();
+}
+
+void MainWindow::toggleReadOnly() {
+    m_isReadOnly = m_readOnlyAct->isChecked();
+}
+
 void MainWindow::addEditorTab(const QString &title, const QString &content, bool isViz)
 {
-    QTextEdit *ed = new QTextEdit(this);
+    AsmEditor *ed = new AsmEditor(this);
     if (!content.isEmpty()) {
         loadLargeText(ed, content);
     }
@@ -202,13 +233,10 @@ void MainWindow::addEditorTab(const QString &title, const QString &content, bool
 void MainWindow::appendToCurrentTab(const QString &text) {
     QWidget *w = m_tabs->currentWidget();
     if (!w) return;
-    QTextEdit *ed = qobject_cast<QTextEdit*>(w);
+    AsmEditor *ed = qobject_cast<AsmEditor*>(w);
     if (!ed) return;
 
-    // To prevent freezing on truly massive outputs, we cap the LIVE view
-    if (ed->document()->characterCount() > 2000000) {
-        return; 
-    }
+    if (ed->document()->characterCount() > 5000000) return; 
 
     ed->moveCursor(QTextCursor::End);
     ed->insertPlainText(text);
@@ -219,7 +247,6 @@ void MainWindow::readProcOutput() {
     m_processedSize += data.size();
     
     if (m_totalExpectedSize > 0) {
-        // objdump output size is roughly 3-5x the binary size
         double progress = (double)m_processedSize / (m_totalExpectedSize * 4.0);
         if (progress > 0.99) progress = 0.99;
         m_progressBar->setValue(progress * 100);
@@ -233,8 +260,8 @@ void MainWindow::readProcError() {
     appendToCurrentTab("\n--- stderr ---\n" + QString::fromLocal8Bit(data) + "\n");
 }
 
-void MainWindow::loadLargeText(QTextEdit *ed, const QString &content) {
-    if (content.length() > 5000000) { // > 5MB
+void MainWindow::loadLargeText(AsmEditor *ed, const QString &content) {
+    if (content.length() > 5000000) { 
         ed->setPlainText("--- WARNING: Large Output Truncated for Performance (Original size: " + QString::number(content.size()) + " chars) ---\n" +
                          "Please use 'Save ASM' to view the full content.\n\n" +
                          content.left(1000000));
@@ -246,7 +273,7 @@ void MainWindow::loadLargeText(QTextEdit *ed, const QString &content) {
 void MainWindow::checkDashboard() {
     bool hasTabs = m_tabs->count() > 0;
     m_tabs->setVisible(hasTabs);
-    m_dashboard->setVisible(!hasTabs);
+    if (m_dashboard) m_dashboard->setVisible(!hasTabs);
 }
 
 void MainWindow::closeTab(int index) {
@@ -284,17 +311,14 @@ void MainWindow::startDisassembly(const QString &file, const QString &arch) {
     args << file;
 
     m_currentAsmPath.clear();
-    
-    // Create tab FIRST for async streaming / 비동기 스트리밍을 위해 탭 먼저 생성
     addEditorTab(QFileInfo(file).fileName(), "");
     
     m_proc->start("objdump", args);
     if (!m_proc->waitForStarted(3000)) {
-        QMessageBox::critical(this, "Error", "Failed to start objdump. Ensure binutils is installed and in your PATH.\nError: " + m_proc->errorString());
-        statusBar()->showMessage("Error: Failed to start objdump");
+        QMessageBox::critical(this, "Error", "Failed to start objdump.");
         m_progressBar->setVisible(false);
     } else {
-        statusBar()->showMessage("Disassembling (" + arch + "): " + file);
+        statusBar()->showMessage(I18n::instance().get("disassembling").c_str() + QString(" (") + arch + "): " + file);
     }
 }
 
@@ -304,10 +328,9 @@ void MainWindow::procFinished(int exitCode, QProcess::ExitStatus status)
     m_progressBar->setValue(100);
     m_progressBar->setVisible(false);
 
-    // Get final output for visualization engine / 시각화 엔진을 위한 최종 출력 획득
     QWidget *w = m_tabs->currentWidget();
     if (w) {
-        QTextEdit *ed = qobject_cast<QTextEdit*>(w);
+        AsmEditor *ed = qobject_cast<AsmEditor*>(w);
         if (ed) {
              QString display = ed->toPlainText();
              std::string mermaid = Visualizer::generateMermaidCFG(display.toStdString());
@@ -315,57 +338,107 @@ void MainWindow::procFinished(int exitCode, QProcess::ExitStatus status)
         }
     }
 
-    statusBar()->showMessage("Disassembly finished", 3000);
-
-    if (exitCode != 0 && exitCode != 137) { // Ignore code 137 if caught manually
-        QMessageBox::warning(this, "objdump", "objdump exited with code " + QString::number(exitCode));
-    }
-}
-
-void MainWindow::onFileTreeActivated(const QModelIndex &index)
-{
-    if (!m_fsModel) return;
-    QString path = m_fsModel->filePath(index);
-    if (QFileInfo(path).isDir()) return;
-
-    QString arch = detectArch(path);
-    bool isBin = (arch != "unknown");
-    
-    // Check for container formats / 컨테이너 형식 확인
-    if (!isBin) {
-        if (path.endsWith(".deb") || path.endsWith(".AppImage") || path.endsWith(".tar.gz")) {
-             QMessageBox::information(this, "Container Detected", "This is an archive/container. Please extract it and open the internal binary for analysis.");
-             return;
-        }
-    }
-
-    if (isBin) {
-        startDisassembly(path, arch);
-    } else {
-        QFile f(path);
-        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return;
-        QString content = QString::fromLocal8Bit(f.readAll());
-        addEditorTab(QFileInfo(path).fileName(), content);
-    }
+    m_lastStatusMsg = QString(I18n::instance().get("saved_to").c_str()) + m_currentAsmPath;
+    statusBar()->showMessage(m_lastStatusMsg);
 }
 
 void MainWindow::saveAsm()
 {
-    QWidget *w = m_tabs->currentWidget();
-    if (!w) return;
-    QTextEdit *ed = qobject_cast<QTextEdit*>(w);
-    if (!ed) return;
-
-    QString path = QFileDialog::getSaveFileName(this, "Save assembly", m_currentAsmPath.isEmpty() ? QStringLiteral("output.asm") : m_currentAsmPath);
-    if (path.isEmpty()) return;
-
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        QMessageBox::critical(this, "Save Error", "Failed to open file for writing: " + path);
+    if (m_currentAsmPath.isEmpty()) {
+        saveAs();
         return;
     }
-    QTextStream ts(&f);
-    ts << ed->toPlainText();
-    f.close();
-    QMessageBox::information(this, "Saved", "Saved assembly to: " + path);
+    QWidget *w = m_tabs->currentWidget();
+    if (w) {
+        AsmEditor *ed = qobject_cast<AsmEditor*>(w);
+        if (ed) {
+             QFile f(m_currentAsmPath);
+             if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                 QTextStream os(&f);
+                 os << ed->toPlainText();
+                 f.close();
+                 statusBar()->showMessage(I18n::instance().get("saved_to").c_str() + m_currentAsmPath, 3000);
+             }
+        }
+    }
+}
+
+void MainWindow::saveAs() {
+    QString fileName = QFileDialog::getSaveFileName(this, "Save As", "", "Assembly Files (*.asm);;All Files (*)");
+    if (fileName.isEmpty()) return;
+    m_currentAsmPath = fileName;
+    saveAsm();
+}
+
+// --- AsmEditor Implementation ---
+
+AsmEditor::AsmEditor(QWidget *parent) : QTextEdit(parent) {
+    m_lineNumberArea = new LineNumberArea(this);
+
+    connect(this->document(), &QTextDocument::blockCountChanged, this, &AsmEditor::updateLineNumberAreaWidth);
+    connect(this->verticalScrollBar(), &QScrollBar::valueChanged, [this](int){ m_lineNumberArea->update(); });
+    connect(this, &QTextEdit::cursorPositionChanged, [this](){ m_lineNumberArea->update(); });
+
+    updateLineNumberAreaWidth(0);
+    setLineWrapMode(QTextEdit::NoWrap);
+}
+
+int AsmEditor::lineNumberAreaWidth() {
+    int digits = 1;
+    int max = qMax(1, document()->blockCount());
+    while (max >= 10) {
+        max /= 10;
+        digits++;
+    }
+    int space = 3 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
+    return space;
+}
+
+void AsmEditor::updateLineNumberAreaWidth(int) {
+    setViewportMargins(lineNumberAreaWidth(), 0, 0, 0);
+}
+
+void AsmEditor::updateLineNumberArea(const QRect &rect, int dy) {
+    if (dy) m_lineNumberArea->scroll(0, dy);
+    else m_lineNumberArea->update(0, rect.y(), m_lineNumberArea->width(), rect.height());
+    if (rect.contains(viewport()->rect())) updateLineNumberAreaWidth(0);
+}
+
+void AsmEditor::resizeEvent(QResizeEvent *e) {
+    QTextEdit::resizeEvent(e);
+    QRect cr = contentsRect();
+    m_lineNumberArea->setGeometry(QRect(cr.left(), cr.top(), lineNumberAreaWidth(), cr.height()));
+}
+
+void AsmEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
+    QPainter painter(m_lineNumberArea);
+    painter.fillRect(event->rect(), QColor("#2b2b2b"));
+
+    QTextBlock block = document()->begin();
+    int blockNumber = block.blockNumber();
+    int top = (int)document()->documentLayout()->blockBoundingRect(block).translated(viewport()->geometry().topLeft()).top();
+    int bottom = top + (int)document()->documentLayout()->blockBoundingRect(block).height();
+
+    while (block.isValid() && top <= event->rect().bottom()) {
+        if (block.isVisible() && bottom >= event->rect().top()) {
+            QString number = QString::number(blockNumber + 1);
+            painter.setPen(QColor("#858585"));
+            painter.drawText(0, top, m_lineNumberArea->width() - 2, fontMetrics().height(), Qt::AlignRight, number);
+        }
+        block = block.next();
+        top = bottom;
+        bottom = top + (int)document()->documentLayout()->blockBoundingRect(block).height();
+        ++blockNumber;
+    }
+}
+
+void AsmEditor::keyPressEvent(QKeyEvent *e) {
+    MainWindow *mw = qobject_cast<MainWindow*>(parentWidget()->parentWidget()->parentWidget());
+    if (mw && mw->m_readOnlyAct->isChecked()) {
+        if (e->key() != Qt::Key_Control && e->key() != Qt::Key_C && e->key() != Qt::Key_Left && e->key() != Qt::Key_Right && e->key() != Qt::Key_Up && e->key() != Qt::Key_Down) {
+            mw->statusBar()->showMessage(I18n::instance().get("readonly_warn").c_str(), 5000);
+            return;
+        }
+    }
+    QTextEdit::keyPressEvent(e);
 }

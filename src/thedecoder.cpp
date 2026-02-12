@@ -3,6 +3,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "visualizer.h"
+#include "i18n.h"
+
+/**
+ * @brief thedecoder: Monster Grade Binary Analyzer (CLI)
+ * Rheehose (Rhee Creative) 2008-2026
+ * Apache 2.0 License
+ */
 
 void print_logo() {
     std::cout << "\033[1;36m";
@@ -12,6 +19,7 @@ void print_logo() {
     std::cout << " | |_| | | |  __/ (_| |  __/ (_| (_) | (_| |  __/ |   \n";
     std::cout << "  \\__|_| |_|\\___|\\__,_|\\___|\\___\\___/ \\__,_|\\___|_|   \n";
     std::cout << "\033[0m";
+    std::cout << "         --- " << I18n::instance().get("app_title") << " ---\n";
     std::cout << "         --- Beyond Perfection, Monster Grade ---\n\n";
 }
 
@@ -37,37 +45,45 @@ std::string clean_path(std::string path) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: thedecoder <binary> [-o output.asm] [--intel]\n";
-        return 1;
-    }
-
     std::string infile;
     std::string outfile;
     bool intel = false;
     bool graph = false;
 
-    infile = clean_path(argv[1]);
-    for (int i = 2; i < argc; ++i) {
-        std::string a = argv[i];
-        if (a == "-o" && i + 1 < argc) {
-            outfile = clean_path(argv[++i]);
-        } else if (a == "--intel") {
-            intel = true;
-        } else if (a == "--graph") {
-            graph = true;
-        } else if (a == "-h" || a == "--help") {
-            std::cout << "Usage: thedecoder <binary> [-o output.asm] [--intel] [--graph]\n";
-            std::cout << "Options:\n";
-            std::cout << "  -o FILE    Output file path (default: <input>.asm in same dir)\n";
-            std::cout << "  --intel    Use Intel syntax (Auto-detected for x86)\n";
-            std::cout << "  --graph    Generate Mermaid CFG graph (.md)\n";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "/lang") {
+            I18n::instance().toggleLanguage();
+            std::cout << "Language changed / 언어 변경됨: " << I18n::instance().get("lang_toggle") << std::endl;
+            if (argc == 2) return 0; // Just toggling / 그냥 전환만 함
+            continue;
+        }
+        
+        if (arg == "-h" || arg == "--help") {
+            std::cout << I18n::instance().get("cli_usage") << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  -o <file>   Output filename" << std::endl;
+            std::cout << "  --intel     Use Intel syntax" << std::endl;
+            std::cout << "  --graph     Generate Mermaid CFG" << std::endl;
+            std::cout << "  /lang       " << I18n::instance().get("cli_lang_cmd") << std::endl;
             return 0;
         } else {
-            std::cerr << "Unknown option: " << a << "\n";
+            std::cerr << I18n::instance().get("unknown_option") << ": " << arg << "\n";
             return 1;
         }
     }
+
+    if (infile.empty()) {
+        std::cout << I18n::instance().get("cli_usage") << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "  -o <file>   Output filename" << std::endl;
+        std::cout << "  --intel     Use Intel syntax" << std::endl;
+        std::cout << "  --graph     Generate Mermaid CFG" << std::endl;
+        std::cout << "  /lang       " << I18n::instance().get("cli_lang_cmd") << std::endl;
+        return 1;
+    }
+
+    print_logo();
 
     if (outfile.empty()) {
         outfile = infile + ".asm";
@@ -75,7 +91,7 @@ int main(int argc, char** argv) {
 
     struct stat st;
     if (stat(infile.c_str(), &st) != 0) {
-        std::cerr << "Error: Cannot find input file: " << infile << "\n";
+        std::cerr << I18n::instance().get("error_file_not_found") << ": " << infile << "\n";
         return 1;
     }
     long long total_size = st.st_size;
@@ -101,41 +117,49 @@ int main(int argc, char** argv) {
 
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) {
-        std::cerr << "Failed to run objdump. Make sure objdump (binutils) is installed.\n";
+        std::cerr << I18n::instance().get("error_objdump_failed") << "\n";
         return 2;
     }
 
     std::ofstream ofs(outfile, std::ios::out | std::ios::binary);
     if (!ofs) {
-        std::cerr << "Failed to open output file: " << outfile << "\n";
+        std::cerr << I18n::instance().get("error_output_file_failed") << ": " << outfile << "\n";
         pclose(pipe);
         return 3;
     }
 
-    std::cout << "Analyzing: " << infile << " (" << (total_size / 1024) << " KB)\n";
+    std::cout << I18n::instance().get("analyzing") << ": " << infile << " (" << (total_size / 1024) << " KB)\n";
 
+    std::string line;
+    long long total_processed = 0;
+    // Wrap FILE* pipe in an istream for easier line reading
+    // This is a simplified approach; a proper Popen class would be better
     char buf[8192];
-    long long processed = 0;
+    std::string pipe_output_buffer;
     while (fgets(buf, sizeof(buf), pipe)) {
-        std::string line = buf;
-        ofs << line;
-        
-        // Highly simplified progress estimation based on output lines/content
-        // objdump output is usually larger than original binary, we approximate
-        processed += line.size();
-        double progress = (double)processed / (total_size * 3.0); // Rough factor for objdump expansion
+        pipe_output_buffer += buf;
+    }
+    std::istringstream pipe_stream(pipe_output_buffer);
+
+    long long file_size = total_size; // Use original file size for progress estimation base
+    while (std::getline(pipe_stream, line)) {
+        ofs << line << "\n";
+        total_processed += line.size();
+        double progress = (double)total_processed / (file_size * 5.0); // Rough estimate
         if (progress > 0.99) progress = 0.99;
         print_progress(progress);
     }
+    pclose(pipe);
     print_progress(1.0);
-    std::cout << "\n";
+    std::cout << std::endl;
 
-    int status = pclose(pipe);
+    int status = pclose(pipe); // This pclose is redundant if the previous one is kept
     if (status != 0) {
-        std::cerr << "Note: objdump finished with status: " << status << "\n";
+        std::cerr << I18n::instance().get("note_objdump_status") << ": " << status << "\n";
     }
 
-    std::cout << "\033[1;32mDONE!\033[0m Results saved to: " << outfile << "\n";
+    std::cout << "\033[1;32m[+] " << I18n::instance().get("finished") << ": " << outfile << "\033[0m" << std::endl;
+    std::cout << "[*] " << I18n::instance().get("saved_to") << outfile << std::endl;
 
     if (graph) {
         std::ifstream ifs(outfile, std::ios::in | std::ios::binary);
