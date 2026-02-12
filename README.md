@@ -7,6 +7,8 @@
 - **Modern CLI**: Includes ASCII art logo and interactive terminal progress bars. / ASCII 아트 로고 및 인터랙티브 터미널 프로그래스 바 포함.
 - **Zero-Config Auto-Detection**: Automatically identifies binary formats and architectures. / 바이너리 형식 및 아키텍처 자동 탐지.
 - **Intel/ATT Syntax**: Effortlessly switch between syntax styles. / 손쉬운 문법 스타일 전환.
+- **Native Strings Extraction**: Instant human-readable text recovery (CLI `/strings`). / 네이티브 문자열 추출 기능으로 즉각적인 텍스트 복구.
+- **Python Reversing (v4.0)**: Decompile PyInstaller `.exe` to `.py` (CLI `/py`). / PyInstaller `.exe`를 `.py`로 복원하는 파이썬 리버싱 지원.
 - **Bilingual Support**: Fully documented in Korean and English. / 한영병기 문서화 완비.
 
 ## Requirements / 요구 사양
@@ -32,6 +34,15 @@ The `thedecoder` tool provides a world-class interactive experience.
 # Simply run with binary (Auto-detects arch and sets Intel syntax for x86)
 ./build/thedecoder <input_binary>
 
+# Native Strings Extraction / 네이티브 문자열 추출
+./build/thedecoder /strings <input_binary>
+
+# Python Reversing Prep / 파이썬 리버싱 준비
+./build/thedecoder /py <input_exe>
+
+# Toggle Language / 언어 전환
+./build/thedecoder /lang
+
 # Full options with visualization graph
 ./build/thedecoder <input_binary> -o my_code.asm --graph
 ```
@@ -53,6 +64,8 @@ The `thedecoder-ide` provides a premium, high-performance environment for binary
     - **Fully Asynchronous UI**: Prevents application hangs during analysis. / 분석 중 UI 멈춤 현상을 완전히 해결.
     - **Progress Tracking**: Real-time visual progress bar in the status bar. / 상태 표시줄의 실시간 시각적 프로그래스 바.
     - **Premium Dark Mode**: Samsung Notes-inspired aesthetic. / 삼성 노트 스타일의 프리미엄 다크 모드.
+    - **Native Strings**: Dedicated button to extract strings instantly. / 문자열 즉시 추출을 위한 전용 버튼.
+    - **Python Reversing Interface**: Support for analyzing PyInstaller executables. / PyInstaller 실행 파일 분석을 위한 전용 인터페이스.
     - **Syntax Highlighting**: Enhanced register and mnemonic coloring. / 강화된 레지스터 및 니모닉 구문 강조.
     - **Memory Safety**: Safely streams massive binaries without OOM. / OOM 없이 대용량 바이너리를 안전하게 스트리밍.
 
