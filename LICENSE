@@ -204,9 +204,4 @@
 
 ## External Software Acknowledgments / 외부 소프트웨어 고지
 
-This software interacts with and/or links against the following external components:
-
-1. **Qt Framework**: This project uses the Qt5 Widgets module, which is licensed under the **GNU Lesser General Public License (LGPL) v3**. The Qt libraries are dynamically linked, and no changes have been made to the Qt source code. You can find more information about Qt and its source code at [qt.io](https://www.qt.io/).
-2. **GNU Binutils (objdump)**: This project executes the `objdump` utility as an external process. `objdump` is part of the GNU Binutils package and is licensed under the **GNU General Public License (GPL) v3**. This project acts as a wrapper/frontend and does not incorporate the source code of `objdump` directly into its own binaries.
-
-By using this software, you also agree to comply with the terms of the LGPL and GPL where applicable.
+Please refer to the [NOTICE](file:///home/rheehose/문서/rheeworks_nt/thedecoder/NOTICE) file for detailed information regarding external software components used in this project (including Qt and GNU Binutils).

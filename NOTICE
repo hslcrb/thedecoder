@@ -1,0 +1,25 @@
+thedecoder
+Copyright 2008-2026 Rheehose (Rhee Creative)
+
+This product includes software developed by Rheehose (Rhee Creative).
+
+---
+EXTERNAL SOFTWARE COMPONENTS / 외부 소프트웨어 구성 요소
+---
+
+This product interacts with and/or links against the following external components:
+
+1. Qt Framework (LGPL v3)
+   - Used for the graphical user interface (disasm-ide).
+   - This project uses the Qt5 Widgets module.
+   - The Qt libraries are dynamically linked.
+   - Website: https://www.qt.io/
+
+2. GNU Binutils - objdump (GPL v3)
+   - Used as the core disassembly engine.
+   - This project executes the objdump utility as an external process.
+   - Website: https://www.gnu.org/software/binutils/
+
+---
+(C) Rheehose (Rhee Creative) 2008-2026
+"Monster Grade Architecture"
