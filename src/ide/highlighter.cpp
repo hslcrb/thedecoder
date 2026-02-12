@@ -20,11 +20,30 @@ void AsmHighlighter::setDarkMode(bool dark) {
 void AsmHighlighter::setupRules(bool dark) {
     m_rules.clear();
 
-    // Palette Colors / 팔레트 색상
-    QString addrCol = dark ? "#f28b82" : "#c5221f"; // Deep red in light / 라이트 모드에선 깊은 빨강
-    QString opCol   = dark ? "#8ab4f8" : "#1a73e8"; // Vivid blue in light / 라이트 모드에선 선명한 파랑
-    QString regCol  = dark ? "#aecbfa" : "#185abc"; // Darker blue for reg in light / 라이트 모드에선 더 짙은 파랑
-    QString hexCol  = dark ? "#fdd663" : "#e37400"; // Orange/Dark yellow in light / 라이트 모드에선 오렌지/짙은 노랑
+    // Palette Colors (Monster Grade) / 팔레트 색상 (몬스터 등급)
+    QString addrCol    = dark ? "#f28b82" : "#c5221f"; // Addresses
+    QString opCol      = dark ? "#8ab4f8" : "#1a73e8"; // Mnemonics
+    QString regCol     = dark ? "#aecbfa" : "#185abc"; // Registers
+    QString hexCol     = dark ? "#fdd663" : "#e37400"; // Hex bytes / Constant
+    QString strCol     = dark ? "#81c995" : "#137333"; // Strings (Vivid Green)
+    QString commentCol = dark ? "#9aa0a6" : "#5f6368"; // Comments
+
+    // Comments / 주석
+    {
+        Rule r;
+        r.re = new QRegularExpression(";.*");
+        r.fmt.setForeground(QColor(commentCol));
+        r.fmt.setFontItalic(true);
+        m_rules.append(r);
+    }
+
+    // Strings / 문자열
+    {
+        Rule r;
+        r.re = new QRegularExpression("\".*?\"|'.*?'");
+        r.fmt.setForeground(QColor(strCol));
+        m_rules.append(r);
+    }
 
     // addresses / 주소
     {

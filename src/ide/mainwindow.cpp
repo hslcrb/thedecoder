@@ -209,11 +209,12 @@ void MainWindow::applyTheme() {
                 background-color: #1a1a1b;
                 color: #e8eaed;
             }
-            QTextEdit {
-                background-color: #202124;
+            QPlainTextEdit, AsmEditor {
+                background-color: #1a1a1b;
                 color: #e8eaed;
                 border: 1px solid #3c4043;
-                border-radius: 8px;
+                border-radius: 4px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
             QTabWidget::pane {
                 border: 1px solid #3c4043;
@@ -260,11 +261,12 @@ void MainWindow::applyTheme() {
                 background-color: #ffffff;
                 color: #202124;
             }
-            QTextEdit {
+            QPlainTextEdit, AsmEditor {
                 background-color: #ffffff;
                 color: #202124;
                 border: 1px solid #dadce0;
-                border-radius: 8px;
+                border-radius: 4px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
             QTabWidget::pane {
                 border: 1px solid #dadce0;
@@ -570,7 +572,21 @@ void AsmEditor::resizeEvent(QResizeEvent *e) {
 
 void AsmEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
     QPainter painter(m_lineNumberArea);
-    painter.fillRect(event->rect(), QColor("#2b2b2b"));
+    
+    // Find theme from parent MainWindow / 부모 MainWindow에서 테마 찾기
+    MainWindow *mw = nullptr;
+    QWidget *p = parentWidget();
+    while (p) {
+        mw = qobject_cast<MainWindow*>(p);
+        if (mw) break;
+        p = p->parentWidget();
+    }
+    
+    bool isDark = mw ? mw->m_isDarkMode : true;
+    QColor bg = isDark ? QColor("#2b2b2b") : QColor("#f1f3f4");
+    QColor fg = isDark ? QColor("#858585") : QColor("#5f6368");
+
+    painter.fillRect(event->rect(), bg);
 
     QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
@@ -580,7 +596,7 @@ void AsmEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
             QString number = QString::number(blockNumber + 1);
-            painter.setPen(QColor("#858585"));
+            painter.setPen(fg);
             painter.drawText(0, top, m_lineNumberArea->width() - 2, fontMetrics().height(), Qt::AlignRight, number);
         }
         block = block.next();
