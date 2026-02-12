@@ -4,6 +4,7 @@
  */
 #include <bits/stdc++.h>
 #include <cstdio>
+#include "visualizer.h"
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -14,6 +15,7 @@ int main(int argc, char** argv) {
     std::string infile;
     std::string outfile;
     bool intel = false;
+    bool graph = false;
 
     infile = argv[1];
     for (int i = 2; i < argc; ++i) {
@@ -22,11 +24,14 @@ int main(int argc, char** argv) {
             outfile = argv[++i];
         } else if (a == "--intel") {
             intel = true;
+        } else if (a == "--graph") {
+            graph = true;
         } else if (a == "-h" || a == "--help") {
-            std::cout << "Usage: disasm <binary> [-o output.asm] [--intel]\n";
+            std::cout << "Usage: disasm <binary> [-o output.asm] [--intel] [--graph]\n";
             std::cout << "Options:\n";
             std::cout << "  -o FILE    Output file path (default: <input>.asm)\n";
             std::cout << "  --intel    Use Intel syntax for disassembly\n";
+            std::cout << "  --graph    Generate Mermaid CFG graph (.md)\n";
             return 0;
         } else {
             std::cerr << "Unknown option: " << a << "\n";
@@ -67,5 +72,16 @@ int main(int argc, char** argv) {
     }
 
     std::cout << "Wrote assembly to: " << outfile << "\n";
+
+    if (graph) {
+        std::ifstream ifs(outfile, std::ios::in | std::ios::binary);
+        std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+        std::string mermaid = Visualizer::generateMermaidCFG(content);
+        std::string graphFile = outfile + ".map.md";
+        std::ofstream gofs(graphFile);
+        gofs << "```mermaid\n" << mermaid << "```\n";
+        std::cout << "Wrote Mermaid graph to: " << graphFile << "\n";
+    }
+
     return 0;
 }

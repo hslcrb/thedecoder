@@ -28,7 +28,7 @@ private slots:
     void onFileTreeActivated(const QModelIndex &index);
 
 private:
-    void addEditorTab(const QString &title, const QString &content);
+    void addEditorTab(const QString &title, const QString &content, bool isViz = false);
 
     QTabWidget *m_tabs;
     QTreeView *m_tree;

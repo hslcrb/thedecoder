@@ -20,6 +20,7 @@
 #include <QDockWidget>
 #include "highlighter.h"
 #include <QStatusBar>
+#include "../visualizer.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_proc(new QProcess(this))
@@ -126,12 +127,18 @@ MainWindow::MainWindow(QWidget *parent)
     this->setStyleSheet(qss);
 }
 
-void MainWindow::addEditorTab(const QString &title, const QString &content)
+void MainWindow::addEditorTab(const QString &title, const QString &content, bool isViz)
 {
     QTextEdit *ed = new QTextEdit(this);
     ed->setPlainText(content);
-    AsmHighlighter *hl = new AsmHighlighter(ed->document());
-    Q_UNUSED(hl);
+    if (!isViz) {
+        AsmHighlighter *hl = new AsmHighlighter(ed->document());
+        Q_UNUSED(hl);
+    } else {
+        ed->setReadOnly(true);
+        // Special styling for visualization text / 시각화 텍스트 특별 스타일링
+        ed->setStyleSheet("QTextEdit { background-color: #1a1a1b; color: #8ab4f8; font-weight: bold; }");
+    }
     int idx = m_tabs->addTab(ed, title);
     m_tabs->setCurrentIndex(idx);
 }
@@ -176,6 +183,10 @@ void MainWindow::procFinished(int exitCode, QProcess::ExitStatus status)
         m_currentAsmPath = bin + ".asm";
     }
     addEditorTab(title, display);
+
+    // Generate Visualization / 시각화 생성
+    std::string mermaid = Visualizer::generateMermaidCFG(display.toStdString());
+    addEditorTab(title + " [Map]", QString::fromStdString(mermaid), true);
 
     statusBar()->showMessage("Disassembly finished", 3000);
 
