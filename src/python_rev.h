@@ -17,12 +17,22 @@ public:
         std::string log;
         log += "[*] Phase 1: Archive Extraction (pyinstxtractor)\n";
         
-        std::string extractCmd = "python3 -m pyinstxtractor " + exePath;
+        std::string extractCmd;
+        
+        // 1. Try python module
+        extractCmd = "python3 -m pyinstxtractor " + exePath + " 2>&1";
         std::string extractOut = exec(extractCmd.c_str());
-        log += extractOut + "\n";
-
+        
+        // 2. Try local tools directory (Absolute path preferred or relative to CWD)
         if (extractOut.find("Successfully extracted") == std::string::npos) {
-            return log + "\n[!] Extraction failed or pyinstxtractor not found.\n";
+            extractCmd = "python3 tools/pyinstxtractor.py " + exePath + " 2>&1";
+            extractOut = exec(extractCmd.c_str());
+        }
+
+        log += extractOut + "\n";
+ 
+        if (extractOut.find("Successfully extracted") == std::string::npos) {
+            return log + "\n[!] Extraction failed. Ensure pyinstxtractor is available in tools/ or as a python module.\n";
         }
 
         log += "[*] Phase 2: Locating Bytecode (.pyc)\n";
