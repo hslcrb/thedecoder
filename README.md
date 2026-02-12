@@ -3,11 +3,11 @@
 `thedecoder`는 `objdump`를 래핑하는 C++ 콘솔 툴 및 Qt 기반 GUI(IDE)입니다. 바이너리 파일을 입력으로 받아 어셈블리 텍스트(`.asm`)로 출력합니다.
 `thedecoder` is a C++ console tool and Qt-based GUI (IDE) that wraps `objdump`. It takes binary files as input and outputs assembly text (`.asm`).
 
-## Features / 주요 기능
-- `objdump` CLI 래핑 / `objdump` CLI wrapping.
-- Intel/ATT 문법 선택 지원 / Support for Intel/ATT syntax selection.
-- Qt 기반 GUI IDE (Syntax Highlighting 포함) / Qt-based GUI IDE with syntax highlighting.
-- 한영병기 인터페이스 및 문서화 / Bilingual interface and documentation.
+- **Async GUI & Memory Safety**: Prevents OOM crashes with non-blocking streaming engine. / 비차단 스트리밍 엔진으로 OOM 크래시 방지.
+- **Modern CLI**: Includes ASCII art logo and interactive terminal progress bars. / ASCII 아트 로고 및 인터랙티브 터미널 프로그래스 바 포함.
+- **Zero-Config Auto-Detection**: Automatically identifies binary formats and architectures. / 바이너리 형식 및 아키텍처 자동 탐지.
+- **Intel/ATT Syntax**: Effortlessly switch between syntax styles. / 손쉬운 문법 스타일 전환.
+- **Bilingual Support**: Fully documented in Korean and English. / 한영병기 문서화 완비.
 
 ## Requirements / 요구 사양
 - CMake 3.5+
@@ -24,23 +24,21 @@ cmake --build .
 
 ## Usage / 사용법
 
-### CLI
-```bash
 ### 1. Command Line Interface (CLI) / 명령줄 인터페이스
-The `thedecoder` tool allows you to disassemble binary files directly from the terminal.
-`thedecoder` 도구를 사용하면 터미널에서 직접 바이너리 파일을 역어셈블할 수 있습니다.
+The `thedecoder` tool provides a world-class interactive experience.
+`thedecoder` 도구는 세계 최고 수준의 인터랙티브 경험을 제공합니다.
 
 ```bash
-# Basic usage with Intel syntax / Intel 문법을 사용한 기본법
-./build/thedecoder <input_binary> -o <output_asm> --intel
+# Simply run with binary (Auto-detects arch and sets Intel syntax for x86)
+./build/thedecoder <input_binary>
 
-# Generate visualization map (Mermaid CFG) / 시각화 맵 생성 (Mermaid CFG)
-./build/thedecoder <input_binary> -o <output_asm> --intel --graph
+# Full options with visualization graph
+./build/thedecoder <input_binary> -o my_code.asm --graph
 ```
 
-- `-o <file>`: Specify output filename (default: input name with .asm). / 출력 파일명을 지정합니다 (기본값: 입력파일명.asm).
-- `--intel`: Use Intel syntax (highly recommended). / Intel 문법을 사용합니다 (강력 권장).
-- `--graph`: Generate a `.map.md` file containing a Mermaid CFG. / Mermaid CFG가 포함된 `.map.md` 파일을 생성합니다.
+- **Interactive Progress Bar**: Real-time feedback during disassembly. / 역어셈블 중 실시간 프로그래스 바 제공.
+- **Smart Path Handling**: Automatically strips quotes and handles various slash formats. / 따옴표 및 다양한 슬래시 형식 자동 처리.
+- **ASCII Art Header**: Starts with a "Monster Grade" ASCII branding. / "Monster Grade" ASCII 브랜딩 헤더와 함께 시작.
 
 ### 2. Graphical User Interface (GUI) / 그래픽 사용자 인터페이스
 The `thedecoder-ide` provides a premium, high-performance environment for binary analysis.
@@ -52,10 +50,11 @@ The `thedecoder-ide` provides a premium, high-performance environment for binary
 ```
 
 - **Features / 주요 기능**:
+    - **Fully Asynchronous UI**: Prevents application hangs during analysis. / 분석 중 UI 멈춤 현상을 완전히 해결.
+    - **Progress Tracking**: Real-time visual progress bar in the status bar. / 상태 표시줄의 실시간 시각적 프로그래스 바.
     - **Premium Dark Mode**: Samsung Notes-inspired aesthetic. / 삼성 노트 스타일의 프리미엄 다크 모드.
-    - **Syntax Highlighting**: Real-time coloring for mnemonics, registers, and hex bytes. / 니모닉, 레지스터, 헥사 바이트 실시간 구문 강조.
-    - **Integrated Map Tab**: View the Control Flow Graph (CFG) alongside the assembly code. / 어셈블리 코드와 함께 제어 흐름 그래프(CFG)를 시각적으로 확인.
-    - **File Navigator**: Easy access to your project files via the built-in tree view. / 내장 트리 뷰를 통한 편리한 프로젝트 파일 접근.
+    - **Syntax Highlighting**: Enhanced register and mnemonic coloring. / 강화된 레지스터 및 니모닉 구문 강조.
+    - **Memory Safety**: Safely streams massive binaries without OOM. / OOM 없이 대용량 바이너리를 안전하게 스트리밍.
 
 ---
 
