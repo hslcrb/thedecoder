@@ -231,6 +231,17 @@ void MainWindow::applyTheme() {
             QToolBar {
                 background-color: #1a1a1b;
                 border-bottom: 1px solid #3c4043;
+                color: #e8eaed;
+            }
+            QToolButton {
+                color: #e8eaed;
+                background-color: transparent;
+                border: none;
+                padding: 4px;
+            }
+            QToolButton:hover {
+                background-color: #3c4043;
+                border-radius: 4px;
             }
             QStatusBar {
                 background-color: #1a1a1b;
@@ -250,7 +261,7 @@ void MainWindow::applyTheme() {
                 color: #202124;
             }
             QTextEdit {
-                background-color: #f8f9fa;
+                background-color: #ffffff;
                 color: #202124;
                 border: 1px solid #dadce0;
                 border-radius: 8px;
@@ -271,6 +282,17 @@ void MainWindow::applyTheme() {
             QToolBar {
                 background-color: #ffffff;
                 border-bottom: 1px solid #dadce0;
+                color: #202124;
+            }
+            QToolButton {
+                color: #202124;
+                background-color: transparent;
+                border: none;
+                padding: 4px;
+            }
+            QToolButton:hover {
+                background-color: #f1f3f4;
+                border-radius: 4px;
             }
             QStatusBar {
                 background-color: #f1f3f4;
@@ -285,6 +307,17 @@ void MainWindow::applyTheme() {
         )";
     }
     this->setStyleSheet(qss);
+    
+    // Update all highlighters in tabs / 탭 내의 모든 하이라이터 업데이트
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        QWidget *w = m_tabs->widget(i);
+        AsmEditor *ed = qobject_cast<AsmEditor*>(w);
+        if (ed) {
+             // Find highlighter attached to document
+             AsmHighlighter *hl = ed->findChild<AsmHighlighter*>();
+             if (hl) hl->setDarkMode(m_isDarkMode);
+        }
+    }
     
     // Update dashboard logo style dynamically / 대시보드 로고 스타일 동적으로 업데이트
     if (m_dashboard) {
@@ -309,7 +342,8 @@ void MainWindow::addEditorTab(const QString &title, const QString &content, bool
     
     if (!isViz) {
         AsmHighlighter *hl = new AsmHighlighter(ed->document());
-        Q_UNUSED(hl);
+        hl->setParent(ed); // Allow findChild from ed / ed에서 findChild 가능하게 함
+        hl->setDarkMode(m_isDarkMode); // Sync initial state / 초기 상태 동기화
     } else {
         ed->setReadOnly(true);
         ed->setStyleSheet("QPlainTextEdit { background-color: #1a1a1b; color: #8ab4f8; font-weight: bold; }");

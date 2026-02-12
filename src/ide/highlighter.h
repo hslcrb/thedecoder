@@ -15,11 +15,13 @@ class AsmHighlighter : public QSyntaxHighlighter
     Q_OBJECT
 public:
     explicit AsmHighlighter(QTextDocument *parent = nullptr);
+    void setDarkMode(bool dark);
 
 protected:
     void highlightBlock(const QString &text) override;
 
 private:
+    void setupRules(bool dark);
     struct Rule { QRegularExpression *re; QTextCharFormat fmt; };
     QVector<Rule> m_rules;
 };
