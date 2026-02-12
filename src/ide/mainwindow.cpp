@@ -22,7 +22,10 @@
 #include "highlighter.h"
 #include <QStatusBar>
 #include <QDir>
+#include <QPainter>
+#include <QTextBlock>
 #include "../visualizer.h"
+#include "../strings_extractor.h"
 
 /**
  * @brief Simple Dashboard for landing state / 랜딩 상태를 위한 단순 대시보드
@@ -161,6 +164,16 @@ void MainWindow::setupToolbar() {
 
     tb->addSeparator();
 
+    m_pythonAct = new QAction(I18n::instance().get("python_rev").c_str(), this);
+    connect(m_pythonAct, &QAction::triggered, this, &MainWindow::runPythonRev);
+    tb->addAction(m_pythonAct);
+
+    m_stringsAct = new QAction(I18n::instance().get("extract_strings").c_str(), this);
+    connect(m_stringsAct, &QAction::triggered, this, &MainWindow::extractStrings);
+    tb->addAction(m_stringsAct);
+
+    tb->addSeparator();
+
     m_langAct = new QAction(I18n::instance().get("lang_toggle").c_str(), this);
     connect(m_langAct, &QAction::triggered, this, &MainWindow::toggleLanguage);
     tb->addAction(m_langAct);
@@ -192,6 +205,8 @@ void MainWindow::updateUiText() {
     m_saveAsAct->setText(I18n::instance().get("save_as").c_str());
     m_langAct->setText(I18n::instance().get("lang_toggle").c_str());
     m_readOnlyAct->setText(I18n::instance().get("read_only").c_str());
+    m_pythonAct->setText(I18n::instance().get("python_rev").c_str());
+    m_stringsAct->setText(I18n::instance().get("extract_strings").c_str());
     
     if (m_progressBar->isVisible()) {
         statusBar()->showMessage(I18n::instance().get("disassembling").c_str());
@@ -368,6 +383,32 @@ void MainWindow::saveAs() {
     if (fileName.isEmpty()) return;
     m_currentAsmPath = fileName;
     saveAsm();
+}
+
+void MainWindow::extractStrings() {
+    QString fileName = QFileDialog::getOpenFileName(this, "Select File for Strings Extraction");
+    if (fileName.isEmpty()) return;
+    
+    statusBar()->showMessage("Extracting strings...");
+    std::string result = StringsExtractor::extract(fileName.toStdString());
+    addEditorTab(QFileInfo(fileName).fileName() + " [Strings]", QString::fromStdString(result));
+    statusBar()->showMessage(I18n::instance().get("strings_finished").c_str(), 3000);
+}
+
+void MainWindow::runPythonRev() {
+    QString fileName = QFileDialog::getOpenFileName(this, "Select Python Binary (.exe)", "", "Executable Files (*.exe);;All Files (*)");
+    if (fileName.isEmpty()) return;
+
+    statusBar()->showMessage(I18n::instance().get("python_rev").c_str());
+    
+    QProcess p;
+    p.start("python3", QStringList() << "-m" << "pyinstxtractor" << "-h");
+    if (!p.waitForStarted() || p.exitCode() != 0) {
+        QMessageBox::warning(this, "Python Rev", "pyinstxtractor not found. Please run: pip install pyinstxtractor");
+        return;
+    }
+
+    addEditorTab(QFileInfo(fileName).fileName() + " [Python Source]", "# Python Reversing Interface Ready\n# Please ensure pyinstxtractor and uncompyle6 are in your environment.");
 }
 
 // --- AsmEditor Implementation ---

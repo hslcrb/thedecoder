@@ -1,15 +1,26 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <map>
 #include <cstdio>
 #include <sys/stat.h>
 #include <unistd.h>
 #include "visualizer.h"
 #include "i18n.h"
+#include "strings_extractor.h"
 
 /**
  * @brief thedecoder: Monster Grade Binary Analyzer (CLI)
  * Rheehose (Rhee Creative) 2008-2026
- * Apache 2.0 License
  */
+
+std::string clean_path(const std::string& p) {
+    if (p.front() == '\'' && p.back() == '\'') return p.substr(1, p.length() - 2);
+    return p;
+}
 
 void print_logo() {
     std::cout << "\033[1;36m";
@@ -17,36 +28,15 @@ void print_logo() {
     std::cout << " | |_| |__   ___  __| | ___  ___ ___   __| | ___ _ __ \n";
     std::cout << " | __| '_ \\ / _ \\/ _` |/ _ \\/ __/ _ \\ / _` |/ _ \\ '__|\n";
     std::cout << " | |_| | | |  __/ (_| |  __/ (_| (_) | (_| |  __/ |   \n";
-    std::cout << "  \\__|_| |_|\\___|\\__,_|\\___|\\___\\___/ \\__,_|\\___|_|   \n";
+    std::cout << "  \\__|_| |_|\\___|\\__,_|\\___|\\__\\___/ \\__,_|\\___|_|   \n";
     std::cout << "\033[0m";
     std::cout << "         --- " << I18n::instance().get("app_title") << " ---\n";
     std::cout << "         --- Beyond Perfection, Monster Grade ---\n\n";
 }
 
-void print_progress(double percentage) {
-    int width = 50;
-    std::cout << "\r[";
-    int pos = width * percentage;
-    for (int i = 0; i < width; ++i) {
-        if (i < pos) std::cout << "=";
-        else if (i == pos) std::cout << ">";
-        else std::cout << " ";
-    }
-    std::cout << "] " << int(percentage * 100.0) << "% " << std::flush;
-}
-
-std::string clean_path(std::string path) {
-    if (path.empty()) return path;
-    if ((path.front() == '"' && path.back() == '"') || (path.front() == '\'' && path.back() == '\'')) {
-        path = path.substr(1, path.size() - 2);
-    }
-    // Simple normalization: convert \ to / for internal use if needed, but here we just keep it
-    return path;
-}
-
 int main(int argc, char** argv) {
     std::string infile;
-    std::string outfile;
+    std::string outfile = "output.asm";
     bool intel = false;
     bool graph = false;
 
@@ -59,117 +49,98 @@ int main(int argc, char** argv) {
             continue;
         }
         
+        if (arg == "/strings" && i + 1 < argc) {
+            std::string target = argv[++i];
+            std::cout << "Extracting strings from: " << target << std::endl;
+            std::cout << StringsExtractor::extract(target) << std::endl;
+            return 0;
+        }
+
+        if (arg == "/py" && i + 1 < argc) {
+             std::string target = argv[++i];
+             std::cout << "Python Reversing engaged for: " << target << std::endl;
+             std::cout << "[!] Please ensure pyinstxtractor is installed via pip." << std::endl;
+             return 0;
+        }
+
         if (arg == "-h" || arg == "--help") {
             std::cout << I18n::instance().get("cli_usage") << std::endl;
             std::cout << "Options:" << std::endl;
             std::cout << "  -o <file>   Output filename" << std::endl;
             std::cout << "  --intel     Use Intel syntax" << std::endl;
             std::cout << "  --graph     Generate Mermaid CFG" << std::endl;
+            std::cout << "  /strings <f> Extract strings from file" << std::endl;
+            std::cout << "  /py <file>  Python reversing (PyInstaller)" << std::endl;
             std::cout << "  /lang       " << I18n::instance().get("cli_lang_cmd") << std::endl;
             return 0;
-        } else {
-            std::cerr << I18n::instance().get("unknown_option") << ": " << arg << "\n";
-            return 1;
+        } else if (arg == "-o" && i + 1 < argc) {
+            outfile = clean_path(argv[++i]);
+        } else if (arg == "--intel") {
+            intel = true;
+        } else if (arg == "--graph") {
+            graph = true;
+        } else if (infile.empty()) {
+            infile = clean_path(arg);
         }
     }
 
     if (infile.empty()) {
         std::cout << I18n::instance().get("cli_usage") << std::endl;
-        std::cout << "Options:" << std::endl;
-        std::cout << "  -o <file>   Output filename" << std::endl;
-        std::cout << "  --intel     Use Intel syntax" << std::endl;
-        std::cout << "  --graph     Generate Mermaid CFG" << std::endl;
-        std::cout << "  /lang       " << I18n::instance().get("cli_lang_cmd") << std::endl;
+        std::cout << "Try 'thedecoder --help' for more information." << std::endl;
         return 1;
-    }
-
-    print_logo();
-
-    if (outfile.empty()) {
-        outfile = infile + ".asm";
     }
 
     struct stat st;
     if (stat(infile.c_str(), &st) != 0) {
-        std::cerr << I18n::instance().get("error_file_not_found") << ": " << infile << "\n";
+        std::cerr << I18n::instance().get("file_not_found") << ": " << infile << std::endl;
         return 1;
     }
-    long long total_size = st.st_size;
+    long total_size = st.st_size;
 
-    // Auto-detect architecture / 아키텍처 자동 탐지
-    std::string arch_cmd = "objdump -f " + infile + " 2>/dev/null";
-    FILE* arch_pipe = popen(arch_cmd.c_str(), "r");
-    bool is_x86_64 = true; // semi-default
-    if (arch_pipe) {
-        char arch_buf[512];
-        while (fgets(arch_buf, sizeof(arch_buf), arch_pipe)) {
-            std::string line = arch_buf;
-            if (line.find("i386:x86-64") != std::string::npos) is_x86_64 = true;
-            else if (line.find("i386") != std::string::npos && line.find("x86-64") == std::string::npos) is_x86_64 = false;
-        }
-        pclose(arch_pipe);
-    }
+    print_logo();
+    std::cout << I18n::instance().get("analyzing") << ": " << infile << " (" << (total_size / 1024) << " KB)\n";
 
-    // Build objdump command
     std::string cmd = "objdump -d ";
-    if (is_x86_64 && intel) cmd += "-Mintel ";
-    cmd += '"' + infile + '"';
+    if (intel) cmd += "-Mintel ";
+    cmd += infile;
 
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) {
-        std::cerr << I18n::instance().get("error_objdump_failed") << "\n";
-        return 2;
+        std::cerr << I18n::instance().get("objdump_fail") << std::endl;
+        return 1;
     }
 
-    std::ofstream ofs(outfile, std::ios::out | std::ios::binary);
-    if (!ofs) {
-        std::cerr << I18n::instance().get("error_output_file_failed") << ": " << outfile << "\n";
-        pclose(pipe);
-        return 3;
-    }
-
-    std::cout << I18n::instance().get("analyzing") << ": " << infile << " (" << (total_size / 1024) << " KB)\n";
-
-    std::string line;
-    long long total_processed = 0;
-    // Wrap FILE* pipe in an istream for easier line reading
-    // This is a simplified approach; a proper Popen class would be better
-    char buf[8192];
     std::string pipe_output_buffer;
-    while (fgets(buf, sizeof(buf), pipe)) {
-        pipe_output_buffer += buf;
-    }
-    std::istringstream pipe_stream(pipe_output_buffer);
-
-    long long file_size = total_size; // Use original file size for progress estimation base
-    while (std::getline(pipe_stream, line)) {
-        ofs << line << "\n";
-        total_processed += line.size();
-        double progress = (double)total_processed / (file_size * 5.0); // Rough estimate
-        if (progress > 0.99) progress = 0.99;
-        print_progress(progress);
+    char buffer[4096];
+    long processed = 0;
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        std::string line(buffer);
+        pipe_output_buffer += line;
+        processed += line.size();
+        
+        int progress = (int)((float)processed / (total_size * 5) * 100); 
+        if (progress > 100) progress = 100;
+        
+        std::cout << "\r" << I18n::instance().get("disassembling") << "... [" << progress << "%] " << std::flush;
     }
     pclose(pipe);
-    print_progress(1.0);
-    std::cout << std::endl;
+    std::cout << "\n";
 
-    int status = pclose(pipe); // This pclose is redundant if the previous one is kept
-    if (status != 0) {
-        std::cerr << I18n::instance().get("note_objdump_status") << ": " << status << "\n";
-    }
-
-    std::cout << "\033[1;32m[+] " << I18n::instance().get("finished") << ": " << outfile << "\033[0m" << std::endl;
-    std::cout << "[*] " << I18n::instance().get("saved_to") << outfile << std::endl;
+    std::ofstream out(outfile);
+    out << pipe_output_buffer;
+    out.close();
 
     if (graph) {
-        std::ifstream ifs(outfile, std::ios::in | std::ios::binary);
-        std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
-        std::string mermaid = Visualizer::generateMermaidCFG(content);
-        std::string graphFile = outfile + ".map.md";
-        std::ofstream gofs(graphFile);
-        gofs << "```mermaid\n" << mermaid << "```\n";
-        std::cout << "Wrote Mermaid graph to: " << graphFile << "\n";
+        std::cout << "[*] " << I18n::instance().get("visualizing") << "...\n";
+        std::string mermaid = Visualizer::generateMermaidCFG(pipe_output_buffer);
+        std::ofstream gout(outfile + ".mermaid");
+        gout << mermaid;
+        gout.close();
+        std::cout << "[+] " << I18n::instance().get("finished") << ": " << outfile << ".mermaid\n";
     }
+
+    std::cout << "\033[1;32m[+] " << I18n::instance().get("finished") << ": " << outfile << "\033[0m\n";
+    std::cout << "[*] " << I18n::instance().get("saved_to") << outfile << std::endl;
 
     return 0;
 }

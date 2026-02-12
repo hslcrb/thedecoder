@@ -54,7 +54,9 @@ private:
         m_dict["finished"] = {"완료됨", "Finished"};
         m_dict["saved_to"] = {"저장 완료: ", "Saved to: "};
         m_dict["readonly_warn"] = {"상단에서 '읽기 전용' 체크를 해제한 후 편집하십시오.", "Please uncheck 'Read Only' at the top to edit."};
-        m_dict["extract_warn"] = {"컨테이너 파일입니다. 압축을 해제한 후 내부 바이너리를 여십시오.", "This is a container. Please extract and open the internal binary."};
+        m_dict["extract_strings"] = {"문자열 추출", "Extract Strings"};
+        m_dict["python_rev"] = {"파이썬 분석", "Python Rev"};
+        m_dict["strings_finished"] = {"문자열 추출 완료", "Strings extraction finished"};
         
         // CLI specific / CLI 전용
         m_dict["cli_usage"] = {"사용법: thedecoder <바이너리> [옵션]", "Usage: thedecoder <binary> [options]"};
