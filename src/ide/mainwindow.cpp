@@ -18,9 +18,41 @@
 #include <QTreeView>
 #include <QFileSystemModel>
 #include <QDockWidget>
+#include <QPushButton>
+#include <QGroupBox>
 #include "highlighter.h"
 #include <QStatusBar>
 #include "../visualizer.h"
+
+DashboardWidget::DashboardWidget(QWidget *parent) : QWidget(parent) {
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setAlignment(Qt::AlignCenter);
+
+    QLabel *logo = new QLabel("thedecoder", this);
+    logo->setStyleSheet("font-size: 48px; font-weight: bold; color: #8ab4f8; margin-bottom: 20px;");
+    layout->addWidget(logo);
+
+    QLabel *desc = new QLabel("Monster-Grade Binary Analyzer", this);
+    desc->setStyleSheet("font-size: 18px; color: #9aa0a6; margin-bottom: 40px;");
+    layout->addWidget(desc);
+
+    QPushButton *openBtn = new QPushButton("Open New Binary", this);
+    openBtn->setFixedSize(200, 50);
+    openBtn->setStyleSheet(R"(
+        QPushButton {
+            background-color: #8ab4f8;
+            color: #202124;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background-color: #aecbfa;
+        }
+    )");
+    layout->addWidget(openBtn);
+    connect(openBtn, &QPushButton::clicked, this, &DashboardWidget::openRequested);
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_proc(new QProcess(this))
@@ -30,7 +62,21 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_tabs = new QTabWidget(this);
     m_tabs->setTabsClosable(true);
-    setCentralWidget(m_tabs);
+    connect(m_tabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
+
+    m_dashboard = new DashboardWidget(this);
+    connect(m_dashboard, &DashboardWidget::openRequested, this, &MainWindow::openBinary);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout();
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->addWidget(m_tabs);
+    mainLayout->addWidget(m_dashboard);
+
+    QWidget *central = new QWidget(this);
+    central->setLayout(mainLayout);
+    setCentralWidget(central);
+    
+    checkDashboard();
 
     // File tree dock
     m_fsModel = new QFileSystemModel(this);
@@ -130,17 +176,50 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::addEditorTab(const QString &title, const QString &content, bool isViz)
 {
     QTextEdit *ed = new QTextEdit(this);
-    ed->setPlainText(content);
+    loadLargeText(ed, content);
+    
     if (!isViz) {
         AsmHighlighter *hl = new AsmHighlighter(ed->document());
         Q_UNUSED(hl);
     } else {
         ed->setReadOnly(true);
-        // Special styling for visualization text / 시각화 텍스트 특별 스타일링
         ed->setStyleSheet("QTextEdit { background-color: #1a1a1b; color: #8ab4f8; font-weight: bold; }");
     }
     int idx = m_tabs->addTab(ed, title);
     m_tabs->setCurrentIndex(idx);
+    checkDashboard();
+}
+
+void MainWindow::loadLargeText(QTextEdit *ed, const QString &content) {
+    if (content.length() > 5000000) { // > 5MB
+        ed->setPlainText("--- WARNING: Large Output Truncated for Performance (Original size: " + QString::number(content.size()) + " chars) ---\n" +
+                         "Please use 'Save ASM' to view the full content.\n\n" +
+                         content.left(1000000));
+    } else {
+        ed->setPlainText(content);
+    }
+}
+
+void MainWindow::checkDashboard() {
+    bool hasTabs = m_tabs->count() > 0;
+    m_tabs->setVisible(hasTabs);
+    m_dashboard->setVisible(!hasTabs);
+}
+
+void MainWindow::closeTab(int index) {
+    m_tabs->removeTab(index);
+    checkDashboard();
+}
+
+QString MainWindow::detectArch(const QString &path) {
+    QProcess p;
+    p.start("objdump", QStringList() << "-f" << path);
+    if (!p.waitForFinished(2000)) return "unknown";
+    QString out = p.readAllStandardOutput();
+    if (out.contains("i386:x86-64")) return "x86-64";
+    if (out.contains("i386")) return "i386";
+    if (out.contains("arm")) return "arm";
+    return "unknown";
 }
 
 void MainWindow::openBinary()
@@ -148,9 +227,14 @@ void MainWindow::openBinary()
     QString file = QFileDialog::getOpenFileName(this, "Open binary");
     if (file.isEmpty()) return;
 
+    QString arch = detectArch(file);
     QStringList args;
     args << "-d";
-    if (m_intelCheck->isChecked()) args << "-Mintel";
+    if (arch == "x86-64" || arch == "i386") {
+        if (m_intelCheck->isVisible()) { // If user can see the check, respect it, but auto-detect usually wants intel
+             args << "-Mintel";
+        }
+    }
     args << file;
 
     m_currentAsmPath.clear();
@@ -159,7 +243,7 @@ void MainWindow::openBinary()
         QMessageBox::critical(this, "Error", "Failed to start objdump. Ensure binutils is installed and in your PATH.\nError: " + m_proc->errorString());
         statusBar()->showMessage("Error: Failed to start objdump");
     } else {
-        statusBar()->showMessage("Disassembling: " + file);
+        statusBar()->showMessage("Disassembling (" + arch + "): " + file);
     }
 }
 
@@ -200,23 +284,27 @@ void MainWindow::onFileTreeActivated(const QModelIndex &index)
     if (!m_fsModel) return;
     QString path = m_fsModel->filePath(index);
     if (QFileInfo(path).isDir()) return;
-    // If file is an executable/binary, run disasm; otherwise open as text
+
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) return;
-    QByteArray header = f.read(4);
+    // We don't need header as detectArch does it
     f.close();
-    bool isBin = false;
-    if (header.size() >= 4) {
-        isBin = (static_cast<unsigned char>(header[0]) == 0x7f && header[1] == 'E' && header[2] == 'L' && header[3] == 'F');
-    }
-    if (!isBin && header.size() >= 2) {
-        isBin = (header[0] == 'M' && header[1] == 'Z');
+
+    QString arch = detectArch(path);
+    bool isBin = (arch != "unknown");
+    
+    // Check for container formats / 컨테이너 형식 확인
+    if (!isBin) {
+        if (path.endsWith(".deb") || path.endsWith(".AppImage") || path.endsWith(".tar.gz")) {
+             QMessageBox::information(this, "Container Detected", "This is an archive/container. Please extract it and open the internal binary for analysis.");
+             return;
+        }
     }
 
     if (isBin) {
         QStringList args;
         args << "-d";
-        if (m_intelCheck->isChecked()) args << "-Mintel";
+        if (arch == "x86-64" || arch == "i386") args << "-Mintel";
         args << path;
         m_proc->start("objdump", args);
     } else {

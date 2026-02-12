@@ -43,9 +43,23 @@ int main(int argc, char** argv) {
         outfile = infile + ".asm";
     }
 
+    // Auto-detect architecture / 아키텍처 자동 탐지
+    std::string arch_cmd = "objdump -f " + infile + " 2>/dev/null";
+    FILE* arch_pipe = popen(arch_cmd.c_str(), "r");
+    bool is_x86_64 = true; // semi-default
+    if (arch_pipe) {
+        char arch_buf[512];
+        while (fgets(arch_buf, sizeof(arch_buf), arch_pipe)) {
+            std::string line = arch_buf;
+            if (line.find("i386:x86-64") != std::string::npos) is_x86_64 = true;
+            else if (line.find("i386") != std::string::npos && line.find("x86-64") == std::string::npos) is_x86_64 = false;
+        }
+        pclose(arch_pipe);
+    }
+
     // Build objdump command
     std::string cmd = "objdump -d ";
-    if (intel) cmd += "-Mintel ";
+    if (is_x86_64 && intel) cmd += "-Mintel ";
     cmd += '"' + infile + '"';
 
     FILE* pipe = popen(cmd.c_str(), "r");
