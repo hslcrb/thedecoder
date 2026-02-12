@@ -1,4 +1,7 @@
-# The Decoder - Simple Disassembler Wrapper / 간단한 역어셈블러 래퍼
+# thedecoder (v6.0)
+
+**The Monster-Grade Binary Analyzer & Disassembler / 몬스터 등급 바이너리 분석기 및 역어셈블러**
+ 래퍼
 
 `thedecoder`는 `objdump`를 래핑하는 C++ 콘솔 툴 및 Qt 기반 GUI(IDE)입니다. 바이너리 파일을 입력으로 받아 어셈블리 텍스트(`.asm`)로 출력합니다.
 `thedecoder` is a C++ console tool and Qt-based GUI (IDE) that wraps `objdump`. It takes binary files as input and outputs assembly text (`.asm`).
@@ -7,9 +10,12 @@
 - **Modern CLI**: Includes ASCII art logo and interactive terminal progress bars. / ASCII 아트 로고 및 인터랙티브 터미널 프로그래스 바 포함.
 - **Zero-Config Auto-Detection**: Automatically identifies binary formats and architectures. / 바이너리 형식 및 아키텍처 자동 탐지.
 - **Intel/ATT Syntax**: Effortlessly switch between syntax styles. / 손쉬운 문법 스타일 전환.
-- **Native Strings Extraction**: Instant human-readable text recovery (CLI `/strings`). / 네이티브 문자열 추출 기능으로 즉각적인 텍스트 복구.
-- **Python Reversing (v4.0)**: Decompile PyInstaller `.exe` to `.py` (CLI `/py`). / PyInstaller `.exe`를 `.py`로 복원하는 파이썬 리버싱 지원.
-- **Bilingual Support**: Fully documented in Korean and English. / 한영병기 문서화 완비.
+- **Native Strings Extractor**: Extract ASCII/Unicode strings from any binary.
+- **Python Reversing Suite (v5.0+)**: Automated PyInstaller extraction and decompilation bridge.
+- **Interpreted Mode (v5.0+)**: Support for JS, Ruby, and other high-level bytecode.
+- **Synchronized Scrolling (v6.0)**: Perfect pixel-sync line numbers for the best viewing experience.
+- **Bilingual Interface**: Seamless Korean and English support.
+ / 한영병기 문서화 완비.
 
 ## Requirements / 요구 사양
 - CMake 3.5+

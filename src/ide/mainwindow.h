@@ -6,7 +6,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QTextEdit>
+#include <QPlainTextEdit>
 #include <QTabWidget>
 #include <QHeaderView>
 #include <QFileDialog>
@@ -29,7 +29,7 @@ class DashboardWidget;
 /**
  * @brief Custom Text Editor with Line Numbers / 행 번호가 포함된 커스텀 텍스트 에디터
  */
-class AsmEditor : public QTextEdit {
+class AsmEditor : public QPlainTextEdit {
     Q_OBJECT
 public:
     AsmEditor(QWidget *parent = nullptr);

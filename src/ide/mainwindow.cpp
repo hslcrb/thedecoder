@@ -4,7 +4,7 @@
  */
 #include "mainwindow.h"
 
-#include <QTextEdit>
+#include <QPlainTextEdit>
 #include <QToolBar>
 #include <QAction>
 #include <QFileDialog>
@@ -312,7 +312,7 @@ void MainWindow::addEditorTab(const QString &title, const QString &content, bool
         Q_UNUSED(hl);
     } else {
         ed->setReadOnly(true);
-        ed->setStyleSheet("QTextEdit { background-color: #1a1a1b; color: #8ab4f8; font-weight: bold; }");
+        ed->setStyleSheet("QPlainTextEdit { background-color: #1a1a1b; color: #8ab4f8; font-weight: bold; }");
     }
     int idx = m_tabs->addTab(ed, title);
     m_tabs->setCurrentIndex(idx);
@@ -495,15 +495,16 @@ void MainWindow::runInterpretedRev() {
 
 // --- AsmEditor Implementation ---
 
-AsmEditor::AsmEditor(QWidget *parent) : QTextEdit(parent) {
+AsmEditor::AsmEditor(QWidget *parent) : QPlainTextEdit(parent) {
     m_lineNumberArea = new LineNumberArea(this);
 
-    connect(this->document(), &QTextDocument::blockCountChanged, this, &AsmEditor::updateLineNumberAreaWidth);
-    connect(this->verticalScrollBar(), &QScrollBar::valueChanged, [this](int){ m_lineNumberArea->update(); });
-    connect(this, &QTextEdit::cursorPositionChanged, [this](){ m_lineNumberArea->update(); });
+    connect(this, &QPlainTextEdit::blockCountChanged, this, &AsmEditor::updateLineNumberAreaWidth);
+    connect(this, &QPlainTextEdit::updateRequest, this, &AsmEditor::updateLineNumberArea);
+    connect(this, &QPlainTextEdit::cursorPositionChanged, [this](){ m_lineNumberArea->update(); });
+    connect(this, &QPlainTextEdit::selectionChanged, [this](){ m_lineNumberArea->update(); });
 
     updateLineNumberAreaWidth(0);
-    setLineWrapMode(QTextEdit::NoWrap);
+    setLineWrapMode(QPlainTextEdit::NoWrap);
 }
 
 int AsmEditor::lineNumberAreaWidth() {
@@ -528,7 +529,7 @@ void AsmEditor::updateLineNumberArea(const QRect &rect, int dy) {
 }
 
 void AsmEditor::resizeEvent(QResizeEvent *e) {
-    QTextEdit::resizeEvent(e);
+    QPlainTextEdit::resizeEvent(e);
     QRect cr = contentsRect();
     m_lineNumberArea->setGeometry(QRect(cr.left(), cr.top(), lineNumberAreaWidth(), cr.height()));
 }
@@ -537,10 +538,10 @@ void AsmEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
     QPainter painter(m_lineNumberArea);
     painter.fillRect(event->rect(), QColor("#2b2b2b"));
 
-    QTextBlock block = document()->begin();
+    QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
-    int top = (int)document()->documentLayout()->blockBoundingRect(block).translated(viewport()->geometry().topLeft()).top();
-    int bottom = top + (int)document()->documentLayout()->blockBoundingRect(block).height();
+    int top = (int)blockBoundingGeometry(block).translated(contentOffset()).top();
+    int bottom = top + (int)blockBoundingRect(block).height();
 
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
@@ -550,17 +551,11 @@ void AsmEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
         }
         block = block.next();
         top = bottom;
-        bottom = top + (int)document()->documentLayout()->blockBoundingRect(block).height();
+        bottom = top + (int)blockBoundingRect(block).height();
         ++blockNumber;
     }
 }
 
 void AsmEditor::keyPressEvent(QKeyEvent *e) {
-    MainWindow *mw = qobject_cast<MainWindow*>(parentWidget()->parentWidget()->parentWidget());
-    if (mw && mw->m_themeAct) { // Using m_themeAct as a proxy check for MW
-         // Proxy check for read-only
-    }
-    
-    // Fallback for keyPress check
-    QTextEdit::keyPressEvent(e);
+    QPlainTextEdit::keyPressEvent(e);
 }
