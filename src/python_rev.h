@@ -9,9 +9,10 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <algorithm>
+#include <sstream>
 
 /**
- * @brief Python Reversing Suite (Bridge to pyinstxtractor and uncompyle6)
+ * @brief Python Reversing Suite (Bridge to pyinstxtractor and pycdc)
  * (C) Rheehose (Rhee Creative) 2008-2026
  */
 class PythonRev {
@@ -26,11 +27,9 @@ public:
         std::string extractOut;
 
         if (pyInstPath.empty()) {
-            // 1. Try python module if local script not found
             extractCmd = "python3 -m pyinstxtractor " + quotedExe + " 2>&1";
             extractOut = exec(extractCmd.c_str());
         } else {
-            // 2. Use local tool
             std::string quotedTool = quote(pyInstPath);
             log += "[+] Using tool at: " + pyInstPath + "\n";
             extractCmd = "python3 " + quotedTool + " " + quotedExe + " 2>&1";
@@ -43,24 +42,53 @@ public:
             return log + "\n[!] Extraction failed. Check path quoting or tool availability.\n";
         }
 
+        // Find entry point from output / 출력에서 진입점 찾기
+        std::string entryPoint = "";
+        std::stringstream ss(extractOut);
+        std::string line;
+        while (std::getline(ss, line)) {
+            if (line.find("Possible entry point:") != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    entryPoint = line.substr(pos + 1);
+                    // Trim spaces / 공백 제거
+                    entryPoint.erase(0, entryPoint.find_first_not_of(" "));
+                    entryPoint.erase(entryPoint.find_last_not_of(" ") + 1);
+                }
+            }
+        }
+
         log += "[*] Phase 2: Locating Bytecode (.pyc)\n";
         std::string folder = exePath + "_extracted";
         log += "[+] Target folder: " + folder + "\n";
+        if (!entryPoint.empty()) {
+            log += "[+] Detected entry point: " + entryPoint + "\n";
+        }
 
-        log += "[*] Phase 3: Decompilation (uncompyle6/pycdc)\n";
-        log += "[!] Manual verification required to find main pyc inside " + folder + ".\n";
-        log += "[*] Use: uncompyle6 <file.pyc> to recover source.\n";
+        log += "[*] Phase 3: Decompilation (pycdc)\n";
+        std::string pycdcPath = findTool("pycdc");
+        if (pycdcPath.empty()) {
+            log += "[!] pycdc not found in tools/. Manual decompile required.\n";
+            log += "[*] Use: tools/pycdc " + folder + "/" + (entryPoint.empty() ? "*.pyc" : entryPoint) + "\n";
+        } else if (entryPoint.empty()) {
+            log += "[!] Could not determine entry point. Check folder: " + folder + "\n";
+        } else {
+            std::string pycFullPath = folder + "/" + entryPoint;
+            log += "[+] Decompiling " + pycFullPath + " ...\n";
+            std::string decompileCmd = quote(pycdcPath) + " " + quote(pycFullPath) + " 2>&1";
+            std::string decompileOut = exec(decompileCmd.c_str());
+            
+            log += "\n--- DECOMPILED SOURCE / 디컴파일된 소스 ---\n";
+            log += decompileOut;
+            log += "\n-------------------------------------------\n";
+        }
 
         return log;
     }
 
 private:
-    /**
-     * @brief Safely quote path for shell execution / 쉘 실행을 위해 경로를 안전하게 따옴표로 감쌈
-     */
     static std::string quote(const std::string& path) {
         std::string p = path;
-        // Escape existing single quotes / 기존 싱글 쿼테이션 이스케이프
         size_t pos = 0;
         while ((pos = p.find("'", pos)) != std::string::npos) {
             p.replace(pos, 1, "'\\''");
@@ -75,7 +103,6 @@ private:
     }
 
     static std::string findTool(const std::string& toolName) {
-        // Search order: ./tools/ (build), ../tools/ (source root), absolute path
         std::vector<std::string> searches = {
             "tools/" + toolName,
             "../tools/" + toolName,

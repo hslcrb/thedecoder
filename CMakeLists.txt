@@ -24,4 +24,5 @@ else()
 endif()
 
 # Copy tools to build directory for convenience / 편의를 위해 도구를 빌드 디렉토리에 복사
-file(COPY "${CMAKE_SOURCE_DIR}/tools" DESTINATION "${CMAKE_BINARY_DIR}")
+file(COPY "${CMAKE_SOURCE_DIR}/tools/pyinstxtractor.py" DESTINATION "${CMAKE_BINARY_DIR}/tools")
+file(COPY "${CMAKE_SOURCE_DIR}/tools/pycdc" DESTINATION "${CMAKE_BINARY_DIR}/tools")
