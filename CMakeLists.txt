@@ -22,3 +22,6 @@ if (Qt5Widgets_FOUND)
 else()
 	message(STATUS "Qt5 Widgets not found — skipping building thedecoder-ide (install libqt5-dev)")
 endif()
+
+# Copy tools to build directory for convenience / 편의를 위해 도구를 빌드 디렉토리에 복사
+file(COPY "${CMAKE_SOURCE_DIR}/tools" DESTINATION "${CMAKE_BINARY_DIR}")
